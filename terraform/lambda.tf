@@ -1,0 +1,59 @@
+data "archive_file" "orchestrator" {
+  type        = "zip"
+  source_dir  = "${path.module}/../src/orchestrator"
+  output_path = "${path.module}/.build/orchestrator.zip"
+}
+
+data "archive_file" "worker" {
+  type        = "zip"
+  source_dir  = "${path.module}/../src/worker"
+  output_path = "${path.module}/.build/worker.zip"
+}
+
+resource "aws_lambda_function" "orchestrator" {
+  function_name    = "ema-scanner-orchestrator"
+  role             = aws_iam_role.orchestrator.arn
+  runtime          = "python3.12"
+  handler          = "app.lambda_handler"
+  memory_size      = 128
+  timeout          = 30
+  filename         = data.archive_file.orchestrator.output_path
+  source_code_hash = data.archive_file.orchestrator.output_base64sha256
+
+  environment {
+    variables = {
+      BUCKET_NAME = aws_s3_bucket.scanner.id
+      QUEUE_URL   = aws_sqs_queue.batches.url
+    }
+  }
+}
+
+resource "aws_lambda_function" "worker" {
+  function_name                  = "ema-scanner-worker"
+  role                           = aws_iam_role.worker.arn
+  runtime                        = "python3.12"
+  handler                        = "app.lambda_handler"
+  memory_size                    = 128
+  timeout                        = 180
+
+
+  filename                       = data.archive_file.worker.output_path
+  source_code_hash               = data.archive_file.worker.output_base64sha256
+
+  environment {
+    variables = {
+      BUCKET_NAME      = aws_s3_bucket.scanner.id
+      DISTRIBUTION_ID  = aws_cloudfront_distribution.results.id
+    }
+  }
+}
+
+resource "aws_lambda_event_source_mapping" "worker_sqs" {
+  event_source_arn = aws_sqs_queue.batches.arn
+  function_name    = aws_lambda_function.worker.arn
+  batch_size       = 1
+
+  scaling_config {
+    maximum_concurrency = 5
+  }
+}

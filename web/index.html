@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMA Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  button, input { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+  :root {
+    --bg-base: #080b12;
+    --bg-surface: #0e1219;
+    --bg-elevated: #141a24;
+    --bg-hover: #1a2130;
+    --border: #1c2333;
+    --border-subtle: #151c28;
+    --text-primary: #e2e8f0;
+    --text-secondary: #64748b;
+    --text-muted: #475569;
+    --accent: #f59e0b;
+    --accent-dim: rgba(245, 158, 11, 0.15);
+    --accent-glow: rgba(245, 158, 11, 0.06);
+    --green: #10b981;
+    --green-dim: rgba(16, 185, 129, 0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239, 68, 68, 0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.15);
+    --font-data: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+    --font-ui: 'Outfit', system-ui, -apple-system, sans-serif;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: var(--font-data);
+    background: var(--bg-base);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Top Banner ── */
+  .banner {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    position: relative;
+  }
+
+  .banner::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent) 80%, transparent);
+    opacity: 0.3;
+  }
+
+  .banner h1 {
+    font-family: var(--font-ui);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-right: auto;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .banner h1::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; box-shadow: 0 0 6px var(--accent); }
+    50% { opacity: 1; box-shadow: 0 0 12px var(--accent); }
+  }
+
+  .banner .meta {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    font-family: var(--font-data);
+    font-size: 11px;
+  }
+
+  .banner .meta strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .meta-sep { margin: 0 6px; color: var(--border); }
+  #meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; }
+  .meta-link { color: var(--text-secondary); text-decoration: none; transition: color 0.2s; }
+  .meta-link:hover { color: var(--accent); }
+
+  /* ── Tab Bar ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    padding: 10px 16px;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+    user-select: none;
+    letter-spacing: 0.01em;
+    position: relative;
+  }
+
+  .tab:hover { color: var(--text-secondary); }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab .count {
+    margin-left: 6px;
+    font-family: var(--font-data);
+    font-size: 10px;
+    font-weight: 500;
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0;
+  }
+
+  .tab.active .count {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  /* ── Source & Week Toggles ── */
+  .source-toggles {
+    display: flex;
+    gap: 6px;
+    padding: 10px 28px;
+    background: var(--bg-base);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .source-group { display: contents; }
+
+  .source-btn {
+    padding: 4px 12px;
+    min-height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .source-btn:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+  }
+
+  .source-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 28px 4px;
+    background: var(--bg-base);
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+
+  .row-count {
+    color: var(--text-secondary);
+    font-family: var(--font-data);
+    font-size: 11px;
+  }
+
+  .row-count strong { color: var(--text-primary); font-weight: 600; }
+
+  .quick-btn, .reset-btn {
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 28px;
+  }
+
+  .quick-btn:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+  }
+
+  .quick-btn.active {
+    background: var(--blue-dim);
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+
+  .reset-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-dim);
+  }
+
+  .quick-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 2px;
+  }
+
+  /* ── Content Area ── */
+  .content {
+    padding: 12px 28px 24px;
+    animation: content-in 0.2s ease-out;
+  }
+
+  @keyframes content-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    overflow-x: scroll;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-muted) var(--bg-elevated);
+  }
+
+  .table-wrap::-webkit-scrollbar { height: 10px; }
+  .table-wrap::-webkit-scrollbar-track { background: var(--bg-elevated); }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 5px; min-width: 40px; }
+  .table-wrap::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    font-family: var(--font-data);
+  }
+
+  th {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 11px;
+    text-align: left;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: color 0.15s;
+  }
+
+  th:hover { color: var(--text-primary); }
+
+  th .sort-arrow {
+    margin-left: 4px;
+    font-size: 9px;
+    opacity: 0.3;
+    transition: opacity 0.15s;
+  }
+
+  th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+
+  td {
+    padding: 5px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+    font-size: 12px;
+    transition: background 0.1s;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tbody tr:nth-child(odd) td { background: var(--bg-surface); }
+  tbody tr:nth-child(even) td { background: var(--bg-base); }
+  tbody tr:hover td { background: var(--bg-hover); }
+
+  /* Frozen symbol column */
+  td.symbol, th.col-symbol {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    border-right: 1px solid var(--border);
+  }
+
+  th.col-symbol {
+    z-index: 3;
+    background: var(--bg-elevated);
+  }
+
+  td.symbol {
+    font-weight: 600;
+    color: var(--text-primary);
+    background: inherit;
+  }
+
+  /* Ensure striping colors persist on frozen column */
+  tbody tr:nth-child(odd) td.symbol { background: var(--bg-surface); }
+  tbody tr:nth-child(even) td.symbol { background: var(--bg-base); }
+  tbody tr:hover td.symbol { background: var(--bg-hover); }
+
+  /* Filter row symbol cell also sticky */
+  .filter-row td.col-symbol-filter {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+  }
+
+  td.symbol a { color: var(--text-primary); text-decoration: none; transition: color 0.15s; }
+  td.symbol a:hover { color: var(--accent); }
+
+  /* ── Color Coding ── */
+  .pct-positive { color: var(--green); }
+  .pct-negative { color: var(--red); }
+  .close-above { color: var(--green); }
+  .close-below { color: var(--red); }
+
+  /* ── Filter Row ── */
+  .filter-row td {
+    padding: 4px 14px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 33px;
+    z-index: 1;
+  }
+
+  .filter-row input {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-data);
+    font-size: 11px;
+    padding: 3px 6px;
+    min-height: 32px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .filter-row input:focus { border-color: var(--accent); }
+  .filter-row input::placeholder { color: var(--text-muted); }
+  .filter-row input.filter-symbol { width: 100%; }
+
+  .filter-row input.filter-num {
+    width: 48px;
+    min-height: 32px;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+
+  .filter-row input.filter-num::-webkit-inner-spin-button,
+  .filter-row input.filter-num::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .num-filter-group {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    height: 32px;
+  }
+
+  .num-filter-group input {
+    border: none !important;
+    border-radius: 0 !important;
+    border-left: 1px solid var(--border) !important;
+    border-right: 1px solid var(--border) !important;
+    min-height: unset !important;
+    height: 100%;
+  }
+
+  .num-filter-group input:focus {
+    border-color: var(--accent) !important;
+    z-index: 1;
+    position: relative;
+  }
+
+  .spin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .spin-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .spin-btn:active { background: var(--accent-dim); color: var(--accent); }
+
+  .filter-row .num-filters {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+
+  /* ── States ── */
+  .loading {
+    text-align: center;
+    padding: 64px 24px;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .loading::before {
+    content: '';
+    display: block;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .error-msg {
+    text-align: center;
+    padding: 64px 24px;
+    color: var(--red);
+    font-family: var(--font-ui);
+    font-size: 14px;
+  }
+
+  /* ── Misc Stats Cards ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    padding: 4px 0;
+  }
+
+  .stat-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .stat-card:hover {
+    border-color: var(--text-muted);
+    transform: translateY(-1px);
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-dim), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .stat-card:hover::before { opacity: 1; }
+
+  .stat-label {
+    font-family: var(--font-ui);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: var(--font-data);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Section Headers (Price Breaks) ── */
+  .section-title {
+    font-family: var(--font-ui);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title .badge {
+    font-family: var(--font-data);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
+
+  .section-gap { margin-top: 20px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .banner {
+      padding: 10px 12px;
+      gap: 6px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .banner h1 { font-size: 15px; margin-right: 0; }
+    .banner .meta { font-size: 10px; }
+    .tabs { padding: 0 8px; }
+    .tab { padding: 8px 10px; font-size: 11px; min-height: 36px; }
+    .tab .count { font-size: 9px; margin-left: 4px; padding: 1px 5px; }
+    .source-toggles { padding: 6px 8px; gap: 4px; }
+    .source-group { display: flex; gap: 4px; flex-wrap: wrap; width: 100%; }
+    .source-btn { padding: 3px 8px; font-size: 10px; min-height: 26px; }
+    .toolbar { padding: 6px 10px 2px; gap: 4px; }
+    .reset-btn, .quick-btn { font-size: 10px; padding: 3px 8px; min-height: 26px; }
+    .quick-sep { display: none; }
+    .meta-sep { margin: 0 4px; }
+    .content { padding: 6px 4px 16px; }
+    table { font-size: 11px; }
+    th { padding: 6px 4px; font-size: 10px; }
+    td { padding: 4px 4px; font-size: 11px; }
+    td.symbol { max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+    .col-ema { display: none; }
+    .filter-row td { padding: 3px 2px; position: static; }
+    .filter-row .num-filters { gap: 3px; }
+    .filter-row .num-filters-stacked { flex-direction: column; gap: 3px; }
+    .num-filter-group { height: 28px; }
+    .spin-btn { width: 22px; font-size: 11px; }
+    .filter-row input.filter-num { width: 34px; font-size: 10px; padding: 2px 2px; }
+    .filter-row input.filter-symbol { font-size: 10px; min-height: 28px; }
+    .table-wrap { border-radius: var(--radius-sm); border-left: none; border-right: none; }
+    .stat-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .stat-card { padding: 14px 16px; }
+    .stat-value { font-size: 20px; }
+  }
+
+  @media (max-width: 480px) {
+    .banner { padding: 8px 8px; }
+    .banner h1 { font-size: 14px; }
+    .tabs { padding: 0 4px; }
+    .tab { padding: 6px 7px; font-size: 10px; min-height: 32px; }
+    .tab .count { font-size: 8px; padding: 1px 4px; }
+    .source-toggles { padding: 4px 4px; gap: 3px; }
+    .source-group { gap: 3px; }
+    .source-btn { padding: 2px 6px; font-size: 9px; min-height: 24px; }
+    .toolbar { padding: 4px 6px 2px; }
+    .content { padding: 4px 2px 12px; }
+    table { font-size: 10px; }
+    th { padding: 4px 3px; font-size: 9px; }
+    td { padding: 3px 3px; }
+    .filter-row td { padding: 2px 2px; position: static; }
+    .num-filter-group { height: 26px; }
+    .spin-btn { width: 20px; font-size: 10px; }
+    .filter-row input.filter-num { width: 28px; font-size: 9px; }
+    .filter-row input.filter-symbol { font-size: 9px; min-height: 26px; }
+    .stat-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-card { padding: 12px 12px; }
+    .stat-value { font-size: 18px; }
+    .stat-label { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <h1>EMA Scanner</h1>
+  <div id="meta"></div>
+</div>
+
+<div class="tabs" id="tabs"></div>
+<div class="source-toggles" id="source-toggles"></div>
+<div class="source-toggles" id="week-selector" style="display:none"></div>
+<div class="toolbar" id="toolbar"></div>
+<div class="content" id="content">
+  <div class="loading">Loading scan data&hellip;</div>
+</div>
+
+<script>
+const MEGA_CAP = new Set(['AAPL','ABBV','ABT','ACN','ADBE','AMD','AMGN','AMZN','AVGO','AXP','BA','BAC','BRK-B','BX','CAT','CI','CMCSA','COP','COST','CRM','CRWD','CSCO','CVX','DE','DHR','DIS','ETN','GE','GEV','GILD','GOOG','GOOGL','GS','HD','HON','IBM','INTC','INTU','ISRG','JNJ','JPM','KO','LIN','LLY','LMT','LOW','MA','MCD','MDLZ','MRK','MS','MSFT','MU','NEE','NFLX','NKE','NOW','NVDA','ORCL','PEP','PFE','PG','PGR','PLTR','PM','PYPL','QCOM','RTX','SBUX','SCHW','SHW','SPGI','T','TJX','TMO','TMUS','TSLA','TXN','UNH','UNP','UPS','V','VRTX','VZ','WFC','WMT','XOM']);
+
+const TOP_AUM = new Set(['SPY','IVV','VOO','VTI','QQQ','VEA','VTV','IEFA','BND','AGG','VWO','IWM','IEMG','VIG','VUG','IJR','VXUS','GLD','IJH','SCHD','VGT','XLK','BNDX','VO','IWF','VCIT','XLV','ITOT','BSV','DIA']);
+const TOP_VOL = new Set(['SPY','QQQ','IWM','EEM','XLF','HYG','SMH','GDX','SLV','IBIT']);
+const SPDR = new Set(['SPY','GLD','SPLG','XLK','XLF','DIA','SPYG','BIL','XLV','XLE','SPDW','GLDM','SPYV','XLI','XLC','MDY','XLU','XLY','SDY','XLP','SPEM','SPMD','SPSM','SPTM','SPTL','SPIB','SPHY','SPTI','SPAB','SPSB','XBI','XLRE','JNK','SPYD','XLB','SPMB','XAR','SPTS','CWB','SRLN','FEZ','SJNK','GNR','XME','SLYV','SLYG','TOTL','BILS','KRE','SHM','TFI','HYMB','FLRN','MDYG','CWI','MDYV','XOP','KOMP','SPYX','EBND','SPBO','TIPX','RWR','XHB','XSD','BWX','QUS','XNTK','SPGM']);
+const VANGUARD = new Set(['VOO','VTI','VEA','VUG','VTV','BND','VXUS','VWO','VGT','VIG','VO','BNDX','VYM','VB','VCIT','VT','VEU','VV','BSV','VTEB','VCSH','VGIT','VONG','VNQ','VBR','VGK','MGK','BIV','VGSH','VXF','VOE','VOOG','VBK','VYMI','VOT','VHT','VONV','VTIP','VMBS','VTWO','VFH','MGV','VSS','ESGV','VGLT','MGC','VDE','VIGI','VPL','VPU','VDC','VUSB']);
+
+const SPDR_SECTORS = new Set(['SPY','XLE','XLK','XLB','XLV','XLY','XLI','XLC','XLU','XLF','XLRE','XLP']);
+const INDEX_SYMBOLS = new Set(['SPY','QQQ','DIA','IWM']);
+const VANECK_ETFS = new Set(['GDX','GDXJ','MOAT','MOO','MORT','REMX','SMH','SMOG']);
+const WISDOMTREE_ETFS = new Set(['DGRW','DXJ','WCLD','WTV']);
+const GLOBALX_ETFS = new Set(['AIQ','BKCH','BOTZ','BUG','CLOU','COPX','CTEC','DIV','DRIV','EBIZ','EDOC','FINX','GNOM','HERO','LIT','MLPX','POTX','SOCL','URA']);
+const ROUNDHILL_ETFS = new Set(['BETZ','BYTE','CHAT','MEME','NERD','WEED']);
+const COMMODITY_ETFS = new Set(['GLD','SLV','PPLT','PALL','GDX','GDXJ','SIL','COPX','RING','XME','IBIT','ETHE']);
+const SECTOR_ETFS = new Set(['ARKF','ARKG','ARKK','ARKQ','ARKW','BITQ','BLOK','CIBR','CNCR','CQQQ','DFEN','EEM','FAN','FDIS','FDN','FHLC','FTEC','GRID','HACK','IBB','IBIT','ICLN','IFRA','IGV','IHF','IHI','ITA','ITB','IYE','IYF','IYH','IYR','IYT','IYW','IYZ','IZRL','JETS','KBE','KIE','KRE','KWEB','MJ','MSOS','ONLN','PAVE','PBE','PBW','PHO','PJP','PPH','PRNT','PSCT','PSI','QCLN','QQQJ','QTEC','ROBO','SKYY','SLV','SOXQ','SOXX','TAN','URNM','WOOD','XAR','XBI','XHB','XHE','XLB','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY','XME','XNTK','XOP','XRT','XSD','XSW','YOLO']);
+
+const CAP_FILTERS = ['all', 'small', 'mega'];
+const ETF_FILTERS = ['topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'wisdomTree', 'globalX', 'roundhill', 'commodities', 'sector'];
+
+const SOURCE_DEFS = {
+  all:        { label: 'All' },
+  none:       { label: 'None' },
+  small:      { label: '$200B\u2212',  set: null, match: s => !MEGA_CAP.has(s) },
+  mega:       { label: '$200B+',       set: MEGA_CAP },
+  topAUM:     { label: 'Top AUM',      set: TOP_AUM },
+  topVol:     { label: 'Top Vol',      set: TOP_VOL },
+  spdr:       { label: 'SPDR',         set: SPDR },
+  spdrSectors:{ label: 'Sectors',     set: SPDR_SECTORS },
+  vanguard:   { label: 'Vanguard',     set: VANGUARD },
+  vaneck:     { label: 'VanEck',       set: VANECK_ETFS },
+  wisdomTree: { label: 'WisdomTree',   set: WISDOMTREE_ETFS },
+  globalX:    { label: 'Global X',     set: GLOBALX_ETFS },
+  roundhill:  { label: 'Roundhill',    set: ROUNDHILL_ETFS },
+  commodities:{ label: 'Commodities', set: COMMODITY_ETFS },
+  sector:     { label: 'Other ETFs',   set: SECTOR_ETFS },
+};
+
+const SOURCE_ORDER = ['all', 'none', 'small', 'mega', 'topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'wisdomTree', 'globalX', 'roundhill', 'commodities', 'sector'];
+
+const DEFAULT_FILTERS = {
+  close: { min: 10 },
+  count: { min: 5 },
+  weeksBelow: { min: 6 },
+  weeksAbove: { min: 5 },
+  monthsBelow: { min: 4 },
+  monthsAbove: { min: 3 },
+  pct: { min: 3 },
+};
+
+const TAB_DEFS = [
+  { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
+  { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
+  { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'weekAbove',   label: 'Wk Above',       file: '/results/latest-above.json',                 key: 'weekAbove',       cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'dayBelow',    label: 'Day Below',      file: '/results/latest-below.json',                 key: 'dayBelow',        cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'dayAbove',    label: 'Day Above',      file: '/results/latest-above.json',                 key: 'dayAbove',        cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'moCrossUp',   label: 'Mo Cross Up',    file: '/results/latest-monthly.json',               key: 'monthCrossovers', cols: ['symbol','close','monthsBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctAbove' },
+  { id: 'moCrossDown', label: 'Mo Cross Down',  file: '/results/latest-monthly.json',               key: 'monthCrossdowns', cols: ['symbol','close','monthsAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctBelow' },
+  { id: 'moBelow',     label: 'Mo Below',       file: '/results/latest-monthly-below-above.json',   key: 'monthBelow',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'moAbove',     label: 'Mo Above',       file: '/results/latest-monthly-below-above.json',   key: 'monthAbove',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'qCrossUp',   label: 'Q Cross Up',     file: '/results/latest-quarterly.json',              key: 'quarterCrossovers', cols: ['symbol','close','quartersBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctAbove' },
+  { id: 'qCrossDown', label: 'Q Cross Down',   file: '/results/latest-quarterly.json',              key: 'quarterCrossdowns', cols: ['symbol','close','quartersAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctBelow' },
+  { id: 'qBelow',     label: 'Q Below',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterBelow',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'qAbove',     label: 'Q Above',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterAbove',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'performance', label: 'Performance',     special: 'performance' },
+  { id: 'priceBreaks', label: 'Price Breaks',   special: 'priceBreaks' },
+  { id: 'sinceQ',      label: 'Since Quarter',  special: 'sinceQuarter' },
+  { id: 'duringQ',     label: 'During Quarter', special: 'duringQuarter' },
+  { id: 'fwdPE',       label: 'Forward P/E',    special: 'forwardPE' },
+  { id: 'vixSpikes',   label: 'VIX Spikes',     special: 'vixSpikes' },
+  { id: 'miscStats',   label: 'Misc Stats',     special: 'miscStats' },
+];
+
+const COL_LABELS = {
+  symbol: 'Symbol', close: 'Close', ema: 'EMA', pct: '% EMA',
+  weeksBelow: 'Weeks Below', weeksAbove: 'Weeks Above',
+  monthsBelow: 'Months Below', monthsAbove: 'Months Above',
+  quartersBelow: 'Quarters Below', quartersAbove: 'Quarters Above',
+  count: 'Count',
+  ytdPct: 'YTD', highPct: 'vs High', high3yr: '3yr High', lowPct: 'vs Low', low52wk: '52wk Low',
+  rsi: 'RSI', forwardPE: 'Fwd P/E',
+  breakoutPct: 'Breakout %', breakdownPct: 'Breakdown %',
+  breakoutPrice: 'Breakout', breakdownPrice: 'Breakdown',
+  breakoutDate: 'Date', breakdownDate: 'Date',
+  spikeClose: 'Spike Close', pctGain: '% Gain',
+};
+
+const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain']);
+
+const state = {
+  activeSourceMode: 'all',
+  data: {},
+  statsMap: {},
+  activeTab: TAB_DEFS[0].id,
+  sortCol: null,
+  sortAsc: true,
+  filters: {},
+  lowSignalActive: true,
+  activeQuickFilters: new Set(),
+  activeColorFilters: new Set(),
+  manifest: [],
+  selectedWeek: 'latest',
+  dynPctCols: new Set(),
+  dynPECols: new Set(),
+  dynPEPrevCol: {},
+};
+
+function sortQuarterKeys(keys) {
+  // Newest first (e.g. Q4'25, Q3'25, Q2'25, Q1'25, Q4'24...)
+  return [...keys].sort((a, b) => {
+    const [quarterA, yearA] = [a[1], a.slice(3)];
+    const [quarterB, yearB] = [b[1], b.slice(3)];
+    if (yearA !== yearB) return Number(yearB) - Number(yearA);
+    return Number(quarterB) - Number(quarterA);
+  });
+}
+
+/* ── Hash persistence ── */
+
+function readHash() {
+  const h = location.hash.replace('#', '');
+  if (h && TAB_DEFS.some(t => t.id === h)) state.activeTab = h;
+}
+
+function writeHash() {
+  history.replaceState(null, '', '#' + state.activeTab);
+}
+
+/* ── Source toggles ── */
+
+function isSourceActive(id) {
+  if (state.activeSourceMode === 'all') return id === 'all';
+  if (state.activeSourceMode === 'none') return id === 'none';
+  return state.activeSourceMode.has(id);
+}
+
+function renderSourceToggles() {
+  const el = document.getElementById('source-toggles');
+  const capIds = ['all', 'none', 'small', 'mega'];
+  const etfIds = SOURCE_ORDER.filter(id => !capIds.includes(id));
+  const btnHTML = ids => ids.map(id => {
+    const cls = isSourceActive(id) ? ' active' : '';
+    return `<button class="source-btn${cls}" data-src="${id}">${SOURCE_DEFS[id].label}</button>`;
+  }).join('');
+  el.innerHTML =
+    `<div class="source-group">${btnHTML(capIds)}</div>` +
+    `<div class="source-group">${btnHTML(etfIds)}</div>`;
+  el.querySelectorAll('.source-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.src;
+      if (id === 'all') {
+        state.activeSourceMode = 'all';
+      } else if (id === 'none') {
+        state.activeSourceMode = 'none';
+      } else if (CAP_FILTERS.includes(id)) {
+        state.activeSourceMode = new Set([id]);
+      } else {
+        let cur = (state.activeSourceMode instanceof Set) ? new Set(state.activeSourceMode) : new Set();
+        CAP_FILTERS.forEach(c => cur.delete(c));
+        if (cur.has(id)) cur.delete(id);
+        else cur.add(id);
+        state.activeSourceMode = cur.size > 0 ? cur : 'all';
+      }
+      renderSourceToggles();
+      renderTabs();
+      showTab(state.activeTab);
+    })
+  );
+}
+
+function matchesSources(symbol) {
+  if (state.activeSourceMode === 'all') return true;
+  if (state.activeSourceMode === 'none') return false;
+  for (const id of state.activeSourceMode) {
+    const def = SOURCE_DEFS[id];
+    if (def.match) { if (def.match(symbol)) return true; }
+    else if (def.set) { if (def.set.has(symbol)) return true; }
+  }
+  return false;
+}
+
+/* ── Default filters ── */
+
+function applyLowSignalFilters() {
+  for (const [c, def] of Object.entries(DEFAULT_FILTERS)) {
+    state.filters[c] = { ...def };
+  }
+}
+
+function initDefaultFilters() {
+  state.filters = {};
+  state.activeQuickFilters.clear();
+  state.lowSignalActive = true;
+  applyLowSignalFilters();
+}
+
+function clearAllFilters() {
+  state.filters = {};
+  state.activeQuickFilters.clear();
+  state.activeColorFilters.clear();
+  state.lowSignalActive = false;
+}
+
+/* ── Quick filters ── */
+
+const QUICK_FILTERS = [
+  { id: 'low',  label: 'Low $',  col: 'close', values: { min: 3, max: 20 } },
+  { id: 'mid',  label: 'Mid $',  col: 'close', values: { min: 20, max: 300 } },
+  { id: 'high', label: 'High $', col: 'close', values: { min: 300, max: '' } },
+];
+
+const COLOR_FILTERS = [
+  { id: 'ytdGreen',  label: 'YTD+',      test: r => r.ytdPct != null && r.ytdPct >= 0 },
+  { id: 'ytdRed',    label: 'YTD\u2212',  test: r => r.ytdPct != null && r.ytdPct < 0 },
+  { id: 'nearHigh',  label: 'Near High',  test: r => r.highPct != null && r.highPct >= -5 },
+  { id: 'offHigh',   label: 'Off High',   test: r => r.highPct != null && r.highPct < -5 },
+  { id: 'offLow',    label: 'Off Low',    test: r => r.lowPct != null && r.lowPct > 5 },
+  { id: 'nearLow',   label: 'Near Low',   test: r => r.lowPct != null && r.lowPct <= 5 },
+];
+
+const COLOR_FILTERS_MAP = new Map(COLOR_FILTERS.map(cf => [cf.id, cf]));
+
+/* ── Toolbar ── */
+
+function renderToolbar(filteredCount, totalCount) {
+  const el = document.getElementById('toolbar');
+  const quickBtns = QUICK_FILTERS.map(qf => {
+    const cls = state.activeQuickFilters.has(qf.id) ? ' active' : '';
+    return `<button class="quick-btn${cls}" data-qf="${qf.id}">${qf.label}</button>`;
+  }).join('');
+
+  const colorBtns = COLOR_FILTERS.map(cf => {
+    const cls = state.activeColorFilters.has(cf.id) ? ' active' : '';
+    return `<button class="quick-btn${cls}" data-cf="${cf.id}">${cf.label}</button>`;
+  }).join('');
+
+  const lsCls = state.lowSignalActive ? ' active' : '';
+  el.innerHTML =
+    `<span class="row-count">Showing <strong>${filteredCount}</strong> of <strong>${totalCount}</strong></span>` +
+    `<button class="quick-btn${lsCls}" id="low-signal-btn">Filter Low Signal</button>` +
+    `<button class="reset-btn" id="clear-filters-btn">Remove Filters</button>` +
+    `<div class="quick-sep"></div>` +
+    quickBtns +
+    `<div class="quick-sep"></div>` +
+    colorBtns;
+
+  document.getElementById('low-signal-btn').addEventListener('click', () => {
+    state.lowSignalActive = !state.lowSignalActive;
+    if (state.lowSignalActive) {
+      applyLowSignalFilters();
+    } else {
+      for (const c of Object.keys(DEFAULT_FILTERS)) {
+        delete state.filters[c];
+      }
+    }
+    state.activeQuickFilters.clear();
+    renderTabs();
+    showTab(state.activeTab);
+  });
+  document.getElementById('clear-filters-btn').addEventListener('click', () => {
+    clearAllFilters();
+    renderTabs();
+    showTab(state.activeTab);
+  });
+  el.querySelectorAll('.quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const qfId = btn.dataset.qf;
+      const cfId = btn.dataset.cf;
+      if (qfId) {
+        const qf = QUICK_FILTERS.find(q => q.id === qfId);
+        if (state.activeQuickFilters.has(qfId)) {
+          state.activeQuickFilters.delete(qfId);
+          if (DEFAULT_FILTERS[qf.col]) {
+            state.filters[qf.col] = { ...DEFAULT_FILTERS[qf.col] };
+          } else {
+            delete state.filters[qf.col];
+          }
+        } else {
+          QUICK_FILTERS.filter(q => q.col === qf.col && q.id !== qfId)
+            .forEach(q => state.activeQuickFilters.delete(q.id));
+          state.activeQuickFilters.add(qfId);
+          state.filters[qf.col] = { ...qf.values };
+        }
+      } else if (cfId) {
+        if (state.activeColorFilters.has(cfId)) {
+          state.activeColorFilters.delete(cfId);
+        } else {
+          state.activeColorFilters.add(cfId);
+        }
+      }
+      renderTabs();
+      showTab(state.activeTab);
+    });
+  });
+}
+
+/* ── Sorting ── */
+
+function sortRows(rows) {
+  if (!state.sortCol) return rows;
+  const col = state.sortCol;
+  const asc = state.sortAsc;
+  return rows.sort((rowA, rowB) => {
+    const valA = rowA[col], valB = rowB[col];
+    if (typeof valA === 'number' && typeof valB === 'number') return asc ? valA - valB : valB - valA;
+    return asc ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+  });
+}
+
+/* ── Filtering ── */
+
+function applyFilters(rows, cols) {
+  return rows.filter(row => {
+    if (!matchesSources(row.symbol)) return false;
+    for (const col of cols) {
+      const filter = state.filters[col];
+      if (!filter) continue;
+      if (col === 'symbol') {
+        if (filter.text && !String(row[col]).toLowerCase().includes(filter.text.toLowerCase())) return false;
+      } else {
+        const val = row[col];
+        if (val == null) return false;
+        if (filter.min !== '' && filter.min != null && val < Number(filter.min)) return false;
+        if (filter.max !== '' && filter.max != null && val > Number(filter.max)) return false;
+      }
+    }
+    for (const cfId of state.activeColorFilters) {
+      const colorFilter = COLOR_FILTERS_MAP.get(cfId);
+      if (colorFilter && !colorFilter.test(row)) return false;
+    }
+    return true;
+  });
+}
+
+/* ── Row rendering ── */
+
+function renderRowHTML(row, cols, pctField, tabId) {
+  return '<tr>' + cols.map(col => {
+    const val = row[col];
+    const emaCls = col === 'ema' ? ' col-ema' : '';
+    if (col === 'symbol') {
+      const interval = tabId.startsWith('mo') ? 'M' : 'W';
+      const url = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(val)}&interval=${interval}`;
+      return `<td class="symbol"><a href="${url}" target="_blank">${esc(val)}</a></td>`;
+    }
+    if (col === 'pct') {
+      const cls = val > 0 ? 'pct-positive' : val < 0 ? 'pct-negative' : '';
+      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
+    }
+    if (col === 'close') {
+      const cls = row.close > row.ema ? 'close-above' : row.close < row.ema ? 'close-below' : '';
+      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
+    }
+    if (col === 'ytdPct' || col === 'highPct' || col === 'lowPct') {
+      const isGreen = col === 'ytdPct' ? val >= 0 : col === 'highPct' ? val >= -5 : val > 5;
+      const cls = val != null ? (isGreen ? 'pct-positive' : 'pct-negative') : '';
+      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
+    }
+    if (col === 'rsi' && val != null) {
+      const cls = val > 70 ? 'pct-negative' : val < 30 ? 'pct-positive' : '';
+      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
+    }
+    if (col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain') {
+      const cls = val != null ? (val >= 0 ? 'pct-positive' : 'pct-negative') : '';
+      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
+    }
+    if (tabId === 'fwdPE' && state.dynPECols.has(col)) {
+      if (val == null) return `<td class="num">\u2014</td>`;
+      const prevCol = state.dynPEPrevCol[col];
+      const prevVal = prevCol ? row[prevCol] : null;
+      let cls = '';
+      if (prevVal != null) cls = val < prevVal ? 'pct-positive' : val > prevVal ? 'pct-negative' : '';
+      return `<td class="num ${cls}">${val.toFixed(1)}</td>`;
+    }
+    if (state.dynPctCols.has(col) || (state.dynPECols.has(col) && tabId !== 'fwdPE')) {
+      if (val == null) return `<td class="num">\u2014</td>`;
+      const cls = val >= 0 ? 'pct-positive' : 'pct-negative';
+      return `<td class="num ${cls}">${(val > 0 ? '+' : '') + val.toFixed(2)}%</td>`;
+    }
+    if (NUM_COLS.has(col)) return `<td class="num${emaCls}">${fmtNum(col, val)}</td>`;
+    return `<td>${esc(val)}</td>`;
+  }).join('') + '</tr>';
+}
+
+function renderTbodyHTML(rows, cols, pctField, tabId) {
+  if (rows.length === 0) {
+    return `<tr><td colspan="${cols.length}" style="text-align:center;padding:32px;color:var(--text-muted);font-family:var(--font-ui)">No data</td></tr>`;
+  }
+  return rows.map(row => renderRowHTML(row, cols, pctField, tabId)).join('');
+}
+
+/* ── Tabs ── */
+
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  el.innerHTML = TAB_DEFS.map(t => {
+    let countText;
+    if (t.special === 'miscStats') {
+      countText = '';
+    } else if (t.special) {
+      const rows = state.data[t.id] || [];
+      const total = rows.filter(r => matchesSources(r.symbol)).length;
+      countText = `${total}`;
+    } else {
+      const total = state.data[t.id] ? state.data[t.id].filter(r => matchesSources(r.symbol)).length : 0;
+      const filtered = state.data[t.id] ? applyFilters(state.data[t.id], t.cols).length : 0;
+      const isActive = t.id === state.activeTab;
+      const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
+        Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null));
+      countText = hasFilter ? `${filtered} / ${total}` : `${total}`;
+    }
+    const isActive = t.id === state.activeTab;
+    const countSpan = countText ? `<span class="count">${countText}</span>` : '';
+    return `<div class="tab${isActive ? ' active' : ''}" data-tab="${t.id}">` +
+      `${t.label}${countSpan}</div>`;
+  }).join('');
+  el.querySelectorAll('.tab').forEach(tab =>
+    tab.addEventListener('click', () => {
+      state.activeTab = tab.dataset.tab;
+      state.sortCol = null;
+      state.sortAsc = true;
+      writeHash();
+      renderTabs();
+      showTab(state.activeTab);
+    })
+  );
+}
+
+/* ── Table building helpers ── */
+
+function renderTableHeader(def) {
+  return def.cols.map(c => {
+    const isSorted = state.sortCol === c;
+    const arrow = isSorted ? (state.sortAsc ? '\u25B2' : '\u25BC') : '\u25B4';
+    const cls = [c === 'symbol' ? 'col-symbol' : '', NUM_COLS.has(c) ? 'num' : '', isSorted ? 'sorted' : '', c === 'ema' ? 'col-ema' : ''].filter(Boolean).join(' ');
+    return `<th class="${cls}" data-col="${c}">${COL_LABELS[c]}<span class="sort-arrow">${arrow}</span></th>`;
+  }).join('');
+}
+
+function renderFilterRow(def) {
+  return def.cols.map(c => {
+    const emaClass = c === 'ema' ? ' col-ema' : '';
+    if (c === 'symbol') {
+      const val = state.filters[c]?.text || '';
+      return `<td class="col-symbol-filter"><input type="text" class="filter-symbol" data-col="${c}" placeholder="Filter\u2026" value="${esc(val)}"></td>`;
+    }
+    const f = state.filters[c] || {};
+    const minVal = f.min != null ? f.min : '';
+    const stackClass = c === 'close' ? ' num-filters-stacked' : '';
+    let cell = `<td class="num${emaClass}"><div class="num-filters${stackClass}">` +
+      `<div class="num-filter-group">` +
+        `<button class="spin-btn" data-col="${c}" data-bound="min" data-dir="-1">&#x2212;</button>` +
+        `<input type="number" class="filter-num" data-col="${c}" data-bound="min" placeholder="min" value="${minVal}">` +
+        `<button class="spin-btn" data-col="${c}" data-bound="min" data-dir="1">+</button>` +
+      `</div>`;
+    if (c === 'close') {
+      const maxVal = f.max != null ? f.max : '';
+      cell +=
+        `<div class="num-filter-group">` +
+          `<button class="spin-btn" data-col="${c}" data-bound="max" data-dir="-1">&#x2212;</button>` +
+          `<input type="number" class="filter-num" data-col="${c}" data-bound="max" placeholder="max" value="${maxVal}">` +
+          `<button class="spin-btn" data-col="${c}" data-bound="max" data-dir="1">+</button>` +
+        `</div>`;
+    }
+    return cell + `</div></td>`;
+  }).join('');
+}
+
+function renderTableBody(def, rows, tabId) {
+  return renderTbodyHTML(rows, def.cols, def.pctField, tabId);
+}
+
+function attachFilterListeners(def, tabId) {
+  document.querySelectorAll('th[data-col]').forEach(th =>
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (state.sortCol === col) state.sortAsc = !state.sortAsc;
+      else { state.sortCol = col; state.sortAsc = NUM_COLS.has(col) ? false : true; }
+      showTab(tabId);
+    })
+  );
+
+  document.querySelectorAll('.filter-row input').forEach(input => {
+    input.addEventListener('input', () => {
+      const col = input.dataset.col;
+      const bound = input.dataset.bound;
+      if (col === 'symbol') {
+        if (!state.filters[col]) state.filters[col] = {};
+        state.filters[col].text = input.value;
+      } else {
+        if (!state.filters[col]) state.filters[col] = {};
+        state.filters[col][bound] = input.value;
+      }
+      state.lowSignalActive = false;
+      renderTabs();
+      updateRows(tabId);
+    });
+  });
+
+  document.querySelectorAll('.spin-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const col = btn.dataset.col;
+      const bound = btn.dataset.bound;
+      const dir = Number(btn.dataset.dir);
+      if (!state.filters[col]) state.filters[col] = {};
+      const cur = Number(state.filters[col][bound]) || 0;
+      state.filters[col][bound] = cur + dir;
+      const input = btn.closest('.num-filter-group').querySelector('input');
+      if (input) input.value = state.filters[col][bound];
+      state.lowSignalActive = false;
+      renderTabs();
+      updateRows(tabId);
+    });
+  });
+}
+
+/* ── Main tab display ── */
+
+function renderSortableTable(tabId, cols) {
+  const def = { cols };
+  const allRows = state.data[tabId] || [];
+  let rows = applyFilters([...allRows], cols);
+  sortRows(rows);
+
+  const totalSourced = allRows.filter(row => matchesSources(row.symbol)).length;
+  renderToolbar(rows.length, totalSourced);
+
+  const ths = renderTableHeader(def);
+  const filterCells = renderFilterRow(def);
+  const body = renderTbodyHTML(rows, cols, null, tabId);
+
+  document.getElementById('content').innerHTML =
+    `<div class="table-wrap"><table>` +
+    `<thead><tr>${ths}</tr><tr class="filter-row">${filterCells}</tr></thead>` +
+    `<tbody>${body}</tbody>` +
+    `</table></div>`;
+
+  attachFilterListeners(def, tabId);
+}
+
+function showTab(tabId) {
+  const def = TAB_DEFS.find(t => t.id === tabId);
+
+  if (def.special) {
+    showSpecialTab(def);
+    return;
+  }
+
+  renderSortableTable(tabId, def.cols);
+}
+
+const SPECIAL_TAB_COLS = {
+  performance: ['symbol','close','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE'],
+  priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct','rsi'],
+};
+
+function updateRows(tabId) {
+  const def = TAB_DEFS.find(t => t.id === tabId);
+  const cols = def.cols || SPECIAL_TAB_COLS[tabId];
+  if (!cols) return;
+  const allRows = state.data[tabId] || [];
+  let rows = applyFilters([...allRows], cols);
+  sortRows(rows);
+
+  const totalSourced = allRows.filter(r => matchesSources(r.symbol)).length;
+  renderToolbar(rows.length, totalSourced);
+
+  const tbody = document.querySelector('.table-wrap tbody');
+  if (!tbody) return;
+  tbody.innerHTML = renderTbodyHTML(rows, cols, def.pctField, tabId);
+}
+
+/* ── Formatting ── */
+
+function fmtNum(col, v) {
+  if (v == null) return '\u2014';
+  if (col === 'close' || col === 'ema' || col === 'breakoutPrice' || col === 'breakdownPrice' || col === 'spikeClose' || col === 'high3yr' || col === 'low52wk') return v.toFixed(2);
+  if (col === 'pct' || col === 'ytdPct' || col === 'highPct' || col === 'lowPct' || col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain') return (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+  if (col === 'rsi') return v.toFixed(1);
+  if (col === 'forwardPE') return v.toFixed(1);
+  return v.toLocaleString();
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function populateTabData(byUrl) {
+  TAB_DEFS.forEach(t => {
+    if (t.special) return;
+    const json = byUrl[t.file];
+    if (!json) { state.data[t.id] = []; return; }
+    let rows;
+    // Backward compat: old format had "below" with "weeksBelow" field
+    if (t.key === 'weekBelow' && !json.weekBelow && json.below) {
+      rows = json.below.map(row => ({...row, count: row.weeksBelow ?? row.count}));
+    } else {
+      rows = json[t.key] || [];
+    }
+    state.data[t.id] = enrichRows(rows, t);
+  });
+  buildSpecialTabData();
+}
+
+function enrichRows(rows, t) {
+  return rows.map(r => ({
+    ...r,
+    pct: r[t.pctField] != null ? r[t.pctField] : null,
+    ytdPct: state.statsMap[r.symbol]?.ytdPct ?? null,
+    highPct: state.statsMap[r.symbol]?.highPct ?? null,
+    lowPct: state.statsMap[r.symbol]?.lowPct ?? null,
+    rsi: state.statsMap[r.symbol]?.rsi ?? null,
+    forwardPE: state.statsMap[r.symbol]?.forwardPE ?? null,
+  }));
+}
+
+/* ── Meta ── */
+
+async function renderMeta(json) {
+  const t = json.scanTime ? new Date(json.scanTime).toLocaleString() : '\u2014';
+  const scanned = (json.symbolsScanned || 0).toLocaleString();
+  const errs = json.errors || 0;
+
+  let total = '';
+  try {
+    const cb = `_=${Date.now()}`;
+    const resp = await fetch(`/symbols/us-equities.txt?${cb}`);
+    if (resp.ok) {
+      const text = await resp.text();
+      const count = text.trim().split('\n').filter(Boolean).length;
+      total = ` / ${count.toLocaleString()}`;
+    }
+  } catch (err) { console.warn('[meta] symbol count fetch failed:', err.message); }
+
+  const errStyle = errs ? ' style="color:var(--red)"' : '';
+  document.getElementById('meta').innerHTML =
+    `<span class="meta">Updated <strong>${t}</strong></span>` +
+    `<span class="meta-sep">|</span>` +
+    `<span class="meta"><a href="/symbols/us-equities.txt" target="_blank" class="meta-link">${scanned}${total} symbols</a></span>` +
+    `<span class="meta-sep">|</span>` +
+    `<span class="meta"><a href="/results/latest-errors.json" target="_blank" class="meta-link"${errStyle}>${errs} errors</a></span>`;
+}
+
+/* ── Week selector ── */
+
+function fileURLForWeek(latestPath, week) {
+  if (week === 'latest') return latestPath;
+  return latestPath.replace(/\/latest([-.])/g, `/${week}$1`);
+}
+
+function formatWeekLabel(dateStr) {
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  return `${months[m - 1]} ${d}`;
+}
+
+function renderWeekSelector() {
+  const el = document.getElementById('week-selector');
+  if (state.manifest.length < 2) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = '';
+  const latestCls = state.selectedWeek === 'latest' ? ' active' : '';
+  let html = `<button class="source-btn${latestCls}" data-week="latest">Latest</button>`;
+  for (const week of state.manifest) {
+    const cls = state.selectedWeek === week ? ' active' : '';
+    html += `<button class="source-btn${cls}" data-week="${esc(week)}">${formatWeekLabel(week)}</button>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('.source-btn').forEach(btn =>
+    btn.addEventListener('click', () => switchWeek(btn.dataset.week))
+  );
+}
+
+async function switchWeek(week) {
+  if (week === state.selectedWeek) return;
+  state.selectedWeek = week;
+  renderWeekSelector();
+
+  const cb = `_=${Date.now()}`;
+  const latestURLs = [...new Set(TAB_DEFS.filter(t => t.file).map(t => t.file))];
+  const weekURLs = latestURLs.map(u => fileURLForWeek(u, week));
+  const statsURL = fileURLForWeek('/results/latest-stats.json', week);
+  const [statsResult, ...results] = await Promise.allSettled([
+    fetch(`${statsURL}?${cb}`).then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }),
+    ...weekURLs.map(u => fetch(`${u}?${cb}`).then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })),
+  ]);
+
+  if (statsResult.status === 'fulfilled' && statsResult.value.stats) {
+    state.statsMap = Object.fromEntries(statsResult.value.stats.map(s => [s.symbol, s]));
+    if (statsResult.value.misc) state.statsMap._misc = statsResult.value.misc;
+  } else {
+    state.statsMap = {};
+  }
+
+  const byLatestUrl = {};
+  latestURLs.forEach((u, i) => {
+    if (results[i].status === 'fulfilled') byLatestUrl[u] = results[i].value;
+  });
+
+  const meta = byLatestUrl[latestURLs[0]] || byLatestUrl[latestURLs[1]] || byLatestUrl[latestURLs[2]];
+  if (meta) renderMeta(meta);
+
+  populateTabData(byLatestUrl);
+
+  renderTabs();
+  showTab(state.activeTab);
+}
+
+/* ── Special tab rendering ── */
+
+function showSpecialTab(def) {
+  if (def.special === 'miscStats') return showMiscStats();
+  // All other special tabs use standard sortable/filterable table
+  return showSortableSpecialTab(def.id);
+}
+
+function showSortableSpecialTab(tabId) {
+  const cols = SPECIAL_TAB_COLS[tabId];
+  if (!cols) return;
+  renderSortableTable(tabId, cols);
+}
+
+function showMiscStats() {
+  const misc = state.miscStats || {};
+  document.getElementById('toolbar').innerHTML = '';
+
+  const sectorStats = Object.values(state.statsMap).filter(s => s.symbol && SPDR_SECTORS.has(s.symbol));
+  const indexStats = Object.values(state.statsMap).filter(s => s.symbol && INDEX_SYMBOLS.has(s.symbol));
+  const sectorNearHigh = sectorStats.length ? (sectorStats.filter(s => s.highPct != null && s.highPct >= -5).length / sectorStats.length * 100).toFixed(1) + '%' : '\u2014';
+  const indexNearHigh = indexStats.length ? (indexStats.filter(s => s.highPct != null && s.highPct >= -5).length / indexStats.length * 100).toFixed(1) + '%' : '\u2014';
+  const sectorPositiveYTD = sectorStats.length ? (sectorStats.filter(s => s.ytdPct != null && s.ytdPct >= 0).length / sectorStats.length * 100).toFixed(1) + '%' : '\u2014';
+
+  const cards = [
+    { label: 'Within 5% of High', value: misc.pctWithin5OfHigh != null ? misc.pctWithin5OfHigh.toFixed(1) + '%' : '\u2014' },
+    { label: 'Indexes Near High', value: indexNearHigh },
+    { label: 'Sectors Near High', value: sectorNearHigh },
+    { label: 'Positive YTD', value: misc.pctPositiveYTD != null ? misc.pctPositiveYTD.toFixed(1) + '%' : '\u2014' },
+    { label: 'Sectors Positive YTD', value: sectorPositiveYTD },
+    { label: 'Avg YTD', value: misc.avgYTD != null ? (misc.avgYTD > 0 ? '+' : '') + misc.avgYTD.toFixed(2) + '%' : '\u2014', color: misc.avgYTD != null ? (misc.avgYTD >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'Avg Fwd P/E', value: misc.avgForwardPE != null ? misc.avgForwardPE.toFixed(1) : '\u2014' },
+    { label: 'Median Fwd P/E', value: misc.medianForwardPE != null ? misc.medianForwardPE.toFixed(1) : '\u2014' },
+    { label: 'Above 5wk EMA', value: misc.pctAbove5wkEMA != null ? misc.pctAbove5wkEMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove5wkEMA != null ? 'var(--green)' : null },
+    { label: 'Below 5wk EMA', value: misc.pctBelow5wkEMA != null ? misc.pctBelow5wkEMA.toFixed(1) + '%' : '\u2014', color: misc.pctBelow5wkEMA != null ? 'var(--red)' : null },
+  ];
+
+  document.getElementById('content').innerHTML = `<div class="stat-grid">` +
+    cards.map(c => {
+      const colorStyle = c.color ? ` style="color:${c.color}"` : '';
+      return `<div class="stat-card">` +
+        `<div class="stat-label">${c.label}</div>` +
+        `<div class="stat-value"${colorStyle}>${c.value}</div>` +
+        `</div>`;
+    }).join('') +
+    `</div>`;
+}
+
+function buildSpecialTabData() {
+  const stats = Object.values(state.statsMap).filter(s => s.symbol);
+
+  // Clear dynamic column registrations
+  state.dynPctCols = new Set();
+  state.dynPECols = new Set();
+  state.dynPEPrevCol = {};
+
+  // Performance
+  state.data['performance'] = stats.map(s => ({
+    symbol: s.symbol, close: s.close ?? null,
+    ytdPct: s.ytdPct ?? null, highPct: s.highPct ?? null, high3yr: s.high3yr ?? null,
+    lowPct: s.lowPct ?? null, low52wk: s.low52wk ?? null,
+    rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
+  }));
+
+  // Price Breaks — single combined table
+  state.data['priceBreaks'] = stats
+    .filter(s => s.breakoutPct != null || s.breakdownPct != null)
+    .map(s => ({
+      symbol: s.symbol, close: s.close ?? null,
+      breakoutPrice: s.breakoutPrice ?? null, breakoutDate: s.breakoutDate ?? null, breakoutPct: s.breakoutPct ?? null,
+      breakdownPrice: s.breakdownPrice ?? null, breakdownDate: s.breakdownDate ?? null, breakdownPct: s.breakdownPct ?? null,
+      rsi: s.rsi ?? null,
+    }));
+
+  // Quarterly — Since Quarter
+  _buildQuarterlyData(stats, 'sinceQuarter', 'sinceQ');
+  _buildQuarterlyData(stats, 'duringQuarter', 'duringQ');
+
+  // Forward P/E
+  _buildForwardPEData(stats);
+
+  // VIX Spikes
+  _buildVixSpikeData(stats);
+
+  // Misc Stats
+  state.data['miscStats'] = [];
+  state.miscStats = state.statsMap._misc || {};
+}
+
+function _buildQuarterlyData(stats, field, tabId) {
+  const filtered = stats.filter(s => s[field]);
+  const qKeySet = new Set();
+  filtered.forEach(s => Object.keys(s[field]).forEach(k => qKeySet.add(k)));
+  const qKeys = sortQuarterKeys(qKeySet);
+
+  state.data[tabId] = filtered.map(s => {
+    const row = { symbol: s.symbol, close: s.close ?? null, highPct: s.highPct ?? null };
+    qKeys.forEach(k => { row[k] = s[field][k] ?? null; });
+    return row;
+  });
+
+  const cols = ['symbol', 'close', 'highPct', ...qKeys];
+  SPECIAL_TAB_COLS[tabId] = cols;
+  qKeys.forEach(k => {
+    COL_LABELS[k] = COL_LABELS[k] || k;
+    NUM_COLS.add(k);
+    state.dynPctCols.add(k);
+  });
+}
+
+function _buildForwardPEData(stats) {
+  const filtered = stats.filter(s => s.forwardPEHistory);
+  const qKeySet = new Set();
+  filtered.forEach(s => Object.keys(s.forwardPEHistory).forEach(k => qKeySet.add(k)));
+  const qKeys = sortQuarterKeys(qKeySet);
+
+  state.data['fwdPE'] = filtered.map(s => {
+    const row = { symbol: s.symbol, close: s.close ?? null, forwardPE: s.forwardPE ?? null };
+    qKeys.forEach(k => { row[k] = s.forwardPEHistory[k] ?? null; });
+    return row;
+  });
+
+  const cols = ['symbol', 'close', 'forwardPE', ...qKeys];
+  SPECIAL_TAB_COLS['fwdPE'] = cols;
+  qKeys.forEach((k, i) => {
+    COL_LABELS[k] = COL_LABELS[k] || k;
+    NUM_COLS.add(k);
+    state.dynPECols.add(k);
+    if (i > 0) state.dynPEPrevCol[k] = qKeys[i - 1];
+  });
+}
+
+function _buildVixSpikeData(stats) {
+  const filtered = stats.filter(s => s.vixReturns && s.vixReturns.length);
+  const spikeDateSet = new Set();
+  filtered.forEach(s => s.vixReturns.forEach(ret => spikeDateSet.add(ret.dateString)));
+  const spikeDates = [...spikeDateSet];
+
+  // Collect VIX close for labels; parse M/D/YY dates to sort newest-first
+  const spikeVixClose = {};
+  filtered.forEach(s => s.vixReturns.forEach(ret => {
+    if (!spikeVixClose[ret.dateString]) spikeVixClose[ret.dateString] = ret.vixClose;
+  }));
+  function parseMDYY(s) {
+    const [m, d, y] = s.split('/').map(Number);
+    return new Date(2000 + y, m - 1, d).getTime();
+  }
+  spikeDates.sort((a, b) => parseMDYY(b) - parseMDYY(a));
+
+  state.data['vixSpikes'] = filtered.map(s => {
+    const row = { symbol: s.symbol, close: s.close ?? null, highPct: s.highPct ?? null };
+    const gainByDate = {};
+    s.vixReturns.forEach(ret => { gainByDate[ret.dateString] = ret.pctGain; });
+    spikeDates.forEach(dateStr => { row['spike_' + dateStr] = gainByDate[dateStr] ?? null; });
+    return row;
+  });
+
+  const spikeCols = spikeDates.map(dateStr => 'spike_' + dateStr);
+  const cols = ['symbol', 'close', 'highPct', ...spikeCols];
+  SPECIAL_TAB_COLS['vixSpikes'] = cols;
+  spikeCols.forEach((spikeCol, idx) => {
+    const dateStr = spikeDates[idx];
+    COL_LABELS[spikeCol] = `${dateStr} (${spikeVixClose[dateStr]?.toFixed(1) || ''})`;
+    NUM_COLS.add(spikeCol);
+    state.dynPctCols.add(spikeCol);
+  });
+}
+
+/* ── Fetch & init ── */
+
+async function fetchAll() {
+  readHash();
+
+  const cb = `_=${Date.now()}`;
+  const urls = [...new Set(TAB_DEFS.filter(t => t.file).map(t => t.file))];
+  const [manifestResult, statsResult, ...results] = await Promise.allSettled([
+    fetch(`/results/manifest.json?${cb}`).then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }),
+    fetch(`/results/latest-stats.json?${cb}`).then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }),
+    ...urls.map(u => fetch(`${u}?${cb}`).then(r => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    })),
+  ]);
+
+  if (manifestResult.status === 'fulfilled') {
+    const mv = manifestResult.value;
+    state.manifest = Array.isArray(mv) ? mv : (mv.weeks || []);
+  }
+
+  if (statsResult.status === 'fulfilled' && statsResult.value.stats) {
+    state.statsMap = Object.fromEntries(statsResult.value.stats.map(s => [s.symbol, s]));
+    if (statsResult.value.misc) state.statsMap._misc = statsResult.value.misc;
+  }
+
+  const byUrl = {};
+  urls.forEach((u, i) => {
+    if (results[i].status === 'fulfilled') byUrl[u] = results[i].value;
+  });
+
+  const meta = byUrl[urls[0]] || byUrl[urls[1]] || byUrl[urls[2]];
+  if (meta) renderMeta(meta);
+
+  populateTabData(byUrl);
+
+  if (!Object.values(byUrl).length) {
+    document.getElementById('content').innerHTML = '<div class="error-msg">Failed to load scan data.</div>';
+    return;
+  }
+
+  initDefaultFilters();
+  renderSourceToggles();
+  renderWeekSelector();
+  renderTabs();
+  writeHash();
+  showTab(state.activeTab);
+}
+
+fetchAll();
+</script>
+</body>
+</html>

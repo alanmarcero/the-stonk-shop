@@ -1,0 +1,1 @@
+# No third-party dependencies at deploy time (boto3 is pre-installed in Lambda).
