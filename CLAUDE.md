@@ -34,7 +34,7 @@ EventBridge Scheduler (Wed–Fri hourly 10am–3pm, Fri 3:30pm, Wed–Fri 4:05pm
 
 GitHub Actions on push to `main`. Tests → Terraform plan/apply → S3 dashboard deploy → CloudFront invalidation.
 
-**AWS CLI:** Profile `scanner` configured locally for the `github-actions-scanner` IAM user.
+**AWS CLI:** Profile `scanner` configured locally for the `alanmarcero` IAM user.
 
 **Required GitHub secrets:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 
