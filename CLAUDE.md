@@ -10,7 +10,7 @@ python3 -m pytest tests/ -v
 
 ## Architecture
 
-EventBridge (Friday 2 PM ET) → Orchestrator Lambda → SQS → Worker Lambda (reserved concurrency 1) → S3 → CloudFront.
+EventBridge Scheduler (Wed–Fri hourly 10am–3pm, Fri 3:30pm, Wed–Fri 4:05pm ET) → Orchestrator Lambda → SQS → Worker Lambda (max concurrency 5) → S3 → CloudFront.
 
 **Cost goal: under $1/month.** All AWS infrastructure decisions must prioritize minimal cost. Prefer free-tier-eligible resources, avoid provisioned capacity, and keep Lambda memory/timeout as low as practical.
 
@@ -36,7 +36,9 @@ GitHub Actions on push to `main`. Tests → Terraform plan/apply → S3 dashboar
 
 **AWS CLI:** Profile `scanner` configured locally for the `github-actions-scanner` IAM user.
 
-**Required GitHub secrets:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE`
+**Required GitHub secrets:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+
+**Terraform state bucket:** `ema-scanner-tf-state` — bootstrapped separately via `terraform/bootstrap/`.
 
 ## Related Repos
 

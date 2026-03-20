@@ -50,7 +50,7 @@ aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 
 GitHub Actions on push to `main`. Runs tests, then applies Terraform and deploys the web dashboard to S3/CloudFront.
 
-Manual deployment requires these GitHub secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE`.
+Required GitHub secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. Terraform state is stored in `ema-scanner-tf-state` (bootstrapped via `terraform/bootstrap/`).
 
 ## Related Repos
 
