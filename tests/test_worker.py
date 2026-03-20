@@ -63,7 +63,7 @@ class TestProcessBatch:
         self._yahoo_patcher.stop()
 
     def test_crossover_detected(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
 
         result = _process_batch(["TEST"])
 
@@ -75,7 +75,7 @@ class TestProcessBatch:
         assert len(result.errors) == 0
 
     def test_crossover_output_fields(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
 
         result = _process_batch(["AAPL"])
 
@@ -87,7 +87,7 @@ class TestProcessBatch:
         assert isinstance(entry["weeksBelow"], int)
 
     def test_crossover_ema_rounded_to_4_decimals(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
 
         result = _process_batch(["X"])
 
@@ -96,7 +96,7 @@ class TestProcessBatch:
         assert len(decimals) <= 4
 
     def test_crossover_pct_above_rounded_to_2_decimals(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
 
         result = _process_batch(["X"])
 
@@ -104,7 +104,7 @@ class TestProcessBatch:
         assert pct == round(pct, 2)
 
     def test_week_below_detected_with_minimum_weeks(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
 
         result = _process_batch(["TEST"])
 
@@ -114,7 +114,7 @@ class TestProcessBatch:
         assert result.week_below[0]["pctBelow"] > 0
 
     def test_week_below_output_fields(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
 
         result = _process_batch(["X"])
 
@@ -123,7 +123,7 @@ class TestProcessBatch:
 
     def test_week_below_not_detected_under_threshold(self):
         closes = [50.0, 52.0, 54.0, 56.0, 58.0, 56.0, 53.0]
-        self.mock_yahoo.fetch_weekly_candles.return_value = (closes, _timestamps_for(closes))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (closes, _timestamps_for(closes))
 
         result = _process_batch(["TEST"])
 
@@ -131,14 +131,14 @@ class TestProcessBatch:
 
     def test_week_below_two_weeks_not_detected(self):
         closes = [100.0, 102.0, 104.0, 106.0, 108.0, 100.0, 101.0]
-        self.mock_yahoo.fetch_weekly_candles.return_value = (closes, _timestamps_for(closes))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (closes, _timestamps_for(closes))
 
         result = _process_batch(["TEST"])
 
         assert len(result.week_below) == 0
 
     def test_uptrend_no_crossover_no_below(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
 
         result = _process_batch(["BULL"])
 
@@ -147,7 +147,7 @@ class TestProcessBatch:
         assert len(result.errors) == 0
 
     def test_fetch_failure_records_error(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = None
+        self.mock_yahoo.fetch_monthly_candles.return_value = None
 
         result = _process_batch(["FAIL"])
 
@@ -160,7 +160,7 @@ class TestProcessBatch:
         assert "error" in result.errors[0]
 
     def test_insufficient_data_skipped_no_error(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = ([100.0, 101.0, 102.0], [1, 2, 3])
+        self.mock_yahoo.fetch_monthly_candles.return_value = ([100.0, 101.0, 102.0], [1, 2, 3])
 
         result = _process_batch(["SHORT"])
 
@@ -169,7 +169,7 @@ class TestProcessBatch:
         assert len(result.errors) == 0
 
     def test_multiple_symbols_rate_limited(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = ([50.0] * 10, list(range(10)))
+        self.mock_yahoo.fetch_monthly_candles.return_value = ([50.0] * 10, list(range(10)))
 
         _process_batch(["A", "B", "C"])
 
@@ -177,7 +177,7 @@ class TestProcessBatch:
         self.mock_time.sleep.assert_called_with(1)
 
     def test_single_symbol_no_sleep(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = ([50.0] * 10, list(range(10)))
+        self.mock_yahoo.fetch_monthly_candles.return_value = ([50.0] * 10, list(range(10)))
 
         _process_batch(["ONLY"])
 
@@ -189,7 +189,7 @@ class TestProcessBatch:
                 return None
             return (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
 
-        self.mock_yahoo.fetch_weekly_candles.side_effect = weekly_side_effect
+        self.mock_yahoo.fetch_monthly_candles.side_effect = weekly_side_effect
 
         result = _process_batch(["OK", "FAIL", "OK2"])
 
@@ -207,11 +207,11 @@ class TestProcessBatch:
         assert result.day_above == []
         assert result.week_above == []
         assert result.errors == []
-        self.mock_yahoo.fetch_weekly_candles.assert_not_called()
+        self.mock_yahoo.fetch_monthly_candles.assert_not_called()
         self.mock_yahoo.fetch_daily_candles.assert_not_called()
 
     def test_all_failures(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = None
+        self.mock_yahoo.fetch_monthly_candles.return_value = None
 
         result = _process_batch(["A", "B", "C"])
 
@@ -223,7 +223,7 @@ class TestProcessBatch:
 
     def test_day_above_detected(self):
         self.mock_yahoo.fetch_daily_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
-        self.mock_yahoo.fetch_weekly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
 
         result = _process_batch(["BULL"])
 
@@ -234,7 +234,7 @@ class TestProcessBatch:
 
     def test_day_above_output_fields(self):
         self.mock_yahoo.fetch_daily_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
-        self.mock_yahoo.fetch_weekly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
 
         result = _process_batch(["X"])
 
@@ -243,7 +243,7 @@ class TestProcessBatch:
         assert isinstance(entry["count"], int)
 
     def test_week_above_detected(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
 
         result = _process_batch(["BULL"])
 
@@ -253,7 +253,7 @@ class TestProcessBatch:
         assert result.week_above[0]["pctAbove"] > 0
 
     def test_week_above_output_fields(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
 
         result = _process_batch(["X"])
 
@@ -262,7 +262,7 @@ class TestProcessBatch:
 
     def test_daily_fail_still_processes_weekly(self):
         self.mock_yahoo.fetch_daily_candles.return_value = None
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
 
         result = _process_batch(["TEST"])
 
@@ -271,7 +271,7 @@ class TestProcessBatch:
 
     def test_weekly_fail_still_processes_daily(self):
         self.mock_yahoo.fetch_daily_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
-        self.mock_yahoo.fetch_weekly_candles.return_value = None
+        self.mock_yahoo.fetch_monthly_candles.return_value = None
 
         result = _process_batch(["TEST"])
 
@@ -280,7 +280,7 @@ class TestProcessBatch:
 
     def test_all_fetches_fail_records_error(self):
         self.mock_yahoo.fetch_daily_candles.return_value = None
-        self.mock_yahoo.fetch_weekly_candles.return_value = None
+        self.mock_yahoo.fetch_monthly_candles.return_value = None
         self.mock_yahoo.fetch_monthly_candles.return_value = None
         self.mock_yahoo.fetch_quarterly_candles.return_value = None
 
@@ -291,7 +291,7 @@ class TestProcessBatch:
 
     def test_below_ema_not_in_above_lists(self):
         self.mock_yahoo.fetch_daily_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
-        self.mock_yahoo.fetch_weekly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
 
         result = _process_batch(["BEAR"])
 
@@ -299,7 +299,7 @@ class TestProcessBatch:
         assert len(result.week_above) == 0
 
     def test_crossdown_detected(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES))
 
         result = _process_batch(["TEST"])
 
@@ -309,7 +309,7 @@ class TestProcessBatch:
         assert result.crossdowns[0]["pctBelow"] >= 0
 
     def test_crossdown_output_fields(self):
-        self.mock_yahoo.fetch_weekly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES))
 
         result = _process_batch(["X"])
 

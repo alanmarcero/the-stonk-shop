@@ -159,12 +159,11 @@ def _process_batch(
             time.sleep(RATE_LIMIT_DELAY)
 
         daily_result = yahoo.fetch_daily_candles(symbol)
-        weekly_result = yahoo.fetch_weekly_candles(symbol)
         monthly_result = yahoo.fetch_monthly_candles(symbol)
         quarterly_result = yahoo.fetch_quarterly_candles(symbol)
         stats_result = yahoo.fetch_stats_candles(symbol)
 
-        if daily_result is None and weekly_result is None and monthly_result is None and quarterly_result is None:
+        if daily_result is None and monthly_result is None and quarterly_result is None:
             print(f"[worker] {symbol}: fetch failed")
             batch.errors.append({"symbol": symbol, "error": "Failed to fetch candles"})
             continue
@@ -175,7 +174,7 @@ def _process_batch(
         if daily_below is not None:
             batch.day_below.append(daily_below)
 
-        weekly = _process_weekly(symbol, weekly_result)
+        weekly = _process_weekly(symbol, monthly_result)
         if weekly["crossover"] is not None:
             batch.crossovers.append(weekly["crossover"])
         if weekly["crossdown"] is not None:

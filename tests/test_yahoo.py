@@ -2,7 +2,7 @@ from unittest.mock import patch, MagicMock
 import json
 
 from src.worker.yahoo import (
-    fetch_daily_candles, fetch_weekly_candles, fetch_monthly_candles,
+    fetch_daily_candles, fetch_monthly_candles,
     fetch_quarterly_candles, fetch_forward_pe, fetch_vix_candles,
     _parse_response, _parse_forward_pe, _parse_forward_pe_history,
     BASE_URL, TIMESERIES_URL, USER_AGENT, TIMEOUT_SECONDS,
@@ -198,91 +198,6 @@ class TestFetchDailyCandles:
         mock_urlopen.return_value = mock_response
 
         assert fetch_daily_candles("BAD") is None
-
-
-class TestFetchWeeklyCandles:
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_success(self, mock_urlopen):
-        response_data = {
-            "chart": {
-                "result": [{
-                    "timestamp": [1771218000, 1771822800],
-                    "indicators": {"quote": [{"close": [150.0, 155.0]}]},
-                }]
-            }
-        }
-        mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps(response_data).encode()
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
-        mock_urlopen.return_value = mock_response
-
-        result = fetch_weekly_candles("AAPL")
-
-        assert result is not None
-        closes, timestamps = result
-        assert closes == [150.0, 155.0]
-        assert timestamps == [1771218000, 1771822800]
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_builds_correct_url(self, mock_urlopen):
-        mock_urlopen.side_effect = OSError("stop")
-
-        fetch_weekly_candles("MSFT")
-
-        call_args = mock_urlopen.call_args
-        request = call_args[0][0]
-        assert request.full_url == f"{BASE_URL}/MSFT?range=6mo&interval=1wk"
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_sets_user_agent(self, mock_urlopen):
-        mock_urlopen.side_effect = OSError("stop")
-
-        fetch_weekly_candles("GOOG")
-
-        request = mock_urlopen.call_args[0][0]
-        assert request.get_header("User-agent") == USER_AGENT
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_sets_timeout(self, mock_urlopen):
-        mock_urlopen.side_effect = OSError("stop")
-
-        fetch_weekly_candles("TSLA")
-
-        assert mock_urlopen.call_args[1]["timeout"] == TIMEOUT_SECONDS
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_network_error_returns_none(self, mock_urlopen):
-        mock_urlopen.side_effect = ConnectionError("no network")
-
-        assert fetch_weekly_candles("FAIL") is None
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_timeout_returns_none(self, mock_urlopen):
-        from urllib.error import URLError
-        mock_urlopen.side_effect = URLError("timed out")
-
-        assert fetch_weekly_candles("SLOW") is None
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_invalid_json_returns_none(self, mock_urlopen):
-        mock_response = MagicMock()
-        mock_response.read.return_value = b"not json"
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
-        mock_urlopen.return_value = mock_response
-
-        assert fetch_weekly_candles("BAD") is None
-
-    @patch("src.worker.yahoo.urllib.request.urlopen")
-    def test_http_error_returns_none(self, mock_urlopen):
-        from urllib.error import HTTPError
-        mock_urlopen.side_effect = HTTPError(
-            url="http://test", code=404, msg="Not Found", hdrs={}, fp=None
-        )
-
-        assert fetch_weekly_candles("GONE") is None
 
 
 class TestFetchQuarterlyCandles:
