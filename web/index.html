@@ -153,6 +153,22 @@
     border-bottom-color: var(--accent);
   }
 
+  .tab.cross-up { color: var(--text-muted); }
+  .tab.cross-up:hover { color: var(--green); }
+  .tab.cross-up.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+    background: linear-gradient(180deg, transparent 60%, rgba(16, 185, 129, 0.06));
+  }
+
+  .tab.cross-down { color: var(--text-muted); }
+  .tab.cross-down:hover { color: var(--red); }
+  .tab.cross-down.active {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    background: linear-gradient(180deg, transparent 60%, rgba(239, 68, 68, 0.06));
+  }
+
   .tab .count {
     margin-left: 6px;
     font-family: var(--font-data);
@@ -168,6 +184,16 @@
   .tab.active .count {
     background: var(--accent-dim);
     color: var(--accent);
+  }
+
+  .tab.cross-up.active .count {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+
+  .tab.cross-down.active .count {
+    background: var(--red-dim);
+    color: var(--red);
   }
 
   /* ── Source & Week Toggles ── */
@@ -762,6 +788,9 @@ const COL_LABELS = {
   spikeClose: 'Spike Close', pctGain: '% Gain',
 };
 
+const CROSS_UP_TABS = new Set(['crossovers', 'moCrossUp', 'qCrossUp']);
+const CROSS_DOWN_TABS = new Set(['crossdowns', 'moCrossDown', 'qCrossDown']);
+
 const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain']);
 
 const state = {
@@ -1088,7 +1117,8 @@ function renderTabs() {
     }
     const isActive = t.id === state.activeTab;
     const countSpan = countText ? `<span class="count">${countText}</span>` : '';
-    return `<div class="tab${isActive ? ' active' : ''}" data-tab="${t.id}">` +
+    const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
+    return `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">` +
       `${t.label}${countSpan}</div>`;
   }).join('');
   el.querySelectorAll('.tab').forEach(tab =>
