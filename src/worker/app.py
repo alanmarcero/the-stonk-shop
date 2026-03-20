@@ -214,6 +214,14 @@ def _process_batch(
             )
             if computed is not None:
                 computed["symbol"] = symbol
+                if symbol == "VOO":
+                    closes, timestamps = stats_result
+                    election = stats.compute_return_since(closes, timestamps, 2024, 11, 5)
+                    if election is not None:
+                        computed["spxSinceElection"] = election
+                    inauguration = stats.compute_return_since(closes, timestamps, 2025, 1, 20)
+                    if inauguration is not None:
+                        computed["spxSinceInauguration"] = inauguration
                 batch.stats_data.append(computed)
 
     return batch
@@ -555,6 +563,14 @@ def _compute_misc_stats(
     if total_symbols > 0:
         misc["pctAbove5wkEMA"] = round(week_above_count / total_symbols * 100, 1)
         misc["pctBelow5wkEMA"] = round((total_symbols - week_above_count) / total_symbols * 100, 1)
+
+    # SPX milestone returns (from VOO)
+    voo = next((s for s in all_stats if s.get("symbol") == "VOO"), None)
+    if voo:
+        if "spxSinceElection" in voo:
+            misc["spxSinceElection"] = voo["spxSinceElection"]
+        if "spxSinceInauguration" in voo:
+            misc["spxSinceInauguration"] = voo["spxSinceInauguration"]
 
     return misc
 

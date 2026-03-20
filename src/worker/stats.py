@@ -47,6 +47,30 @@ def compute_lowest_close_pct(closes: list[float]) -> Optional[tuple[float, float
     return pct, low
 
 
+def compute_return_since(
+    closes: list[float],
+    timestamps: list[int],
+    year: int,
+    month: int,
+    day: int,
+) -> Optional[float]:
+    """Return % change from close on/near target date to current close."""
+    if len(closes) < 2:
+        return None
+    target = datetime(year, month, day, tzinfo=timezone.utc).timestamp()
+    best_idx = None
+    best_diff = float("inf")
+    three_days = 3 * 86400
+    for i, ts in enumerate(timestamps):
+        diff = abs(ts - target)
+        if diff < best_diff and diff <= three_days:
+            best_diff = diff
+            best_idx = i
+    if best_idx is None or closes[best_idx] == 0:
+        return None
+    return round((closes[-1] - closes[best_idx]) / closes[best_idx] * 100, 2)
+
+
 def compute_stats(
     closes: list[float],
     timestamps: list[int],
