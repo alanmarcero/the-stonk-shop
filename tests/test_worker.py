@@ -320,6 +320,101 @@ class TestProcessBatch:
         assert isinstance(entry["pctBelow"], float)
         assert isinstance(entry["weeksAbove"], int)
 
+    def test_day_below_detected(self):
+        self.mock_yahoo.fetch_daily_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+
+        result = _process_batch(["BEAR"])
+
+        assert len(result.day_below) == 1
+        assert result.day_below[0]["symbol"] == "BEAR"
+        assert result.day_below[0]["count"] == 3
+        assert result.day_below[0]["pctBelow"] > 0
+
+    def test_day_below_output_fields(self):
+        self.mock_yahoo.fetch_daily_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_monthly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+
+        result = _process_batch(["X"])
+
+        entry = result.day_below[0]
+        assert set(entry.keys()) == {"symbol", "close", "ema", "pctBelow", "count"}
+
+    def test_monthly_crossover_detected(self):
+        # _aggregate_to_monthly turns weekly closes into monthly last-closes
+        # We need enough monthly data points (>= 6) for crossover detection
+        from datetime import datetime, timezone
+        monthly_closes = [100.0, 102.0, 104.0, 106.0, 108.0, 100.0, 101.0, 101.0, 106.0]
+        timestamps = [
+            int(datetime(2024, m, 15, tzinfo=timezone.utc).timestamp())
+            for m in range(1, 10)
+        ]
+        self.mock_yahoo.fetch_monthly_candles.return_value = (monthly_closes, timestamps)
+
+        result = _process_batch(["TEST"])
+
+        assert len(result.month_crossovers) == 1
+        assert result.month_crossovers[0]["symbol"] == "TEST"
+        assert "monthsBelow" in result.month_crossovers[0]
+
+    def test_monthly_crossdown_detected(self):
+        from datetime import datetime, timezone
+        monthly_closes = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 40.0]
+        timestamps = [
+            int(datetime(2024, m, 15, tzinfo=timezone.utc).timestamp())
+            for m in range(1, 10)
+        ]
+        self.mock_yahoo.fetch_monthly_candles.return_value = (monthly_closes, timestamps)
+
+        result = _process_batch(["TEST"])
+
+        assert len(result.month_crossdowns) == 1
+        assert result.month_crossdowns[0]["symbol"] == "TEST"
+        assert "monthsAbove" in result.month_crossdowns[0]
+
+    def test_quarterly_crossover_detected(self):
+        from datetime import datetime, timezone
+        # Each close maps to a different quarter
+        quarterly_closes = [100.0, 102.0, 104.0, 106.0, 108.0, 100.0, 101.0, 101.0, 106.0]
+        timestamps = [
+            int(datetime(2022 + i // 4, (i % 4) * 3 + 2, 15, tzinfo=timezone.utc).timestamp())
+            for i in range(9)
+        ]
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (quarterly_closes, timestamps)
+        self.mock_yahoo.fetch_monthly_candles.return_value = ([50.0] * 10, list(range(10)))
+
+        result = _process_batch(["TEST"])
+
+        assert len(result.quarter_crossovers) == 1
+        assert result.quarter_crossovers[0]["symbol"] == "TEST"
+        assert "quartersBelow" in result.quarter_crossovers[0]
+
+    def test_stats_computed_when_stats_candles_available(self):
+        self.mock_yahoo.fetch_monthly_candles.return_value = ([50.0] * 10, list(range(10)))
+        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000])
+        self.mock_yahoo.fetch_forward_pe.return_value = (18.5, {"Q3'25": 18.5})
+        self.mock_stats.compute_stats.return_value = {"close": 105.0, "ytdPct": 5.0}
+
+        result = _process_batch(["AAPL"])
+
+        assert len(result.stats_data) == 1
+        assert result.stats_data[0]["symbol"] == "AAPL"
+        assert result.stats_data[0]["close"] == 105.0
+
+    def test_voo_includes_election_and_inauguration_returns(self):
+        self.mock_yahoo.fetch_monthly_candles.return_value = ([50.0] * 10, list(range(10)))
+        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000])
+        self.mock_yahoo.fetch_forward_pe.return_value = (None, None)
+        self.mock_stats.compute_stats.return_value = {"close": 105.0}
+        self.mock_stats.compute_return_since.side_effect = [12.5, -3.0]
+
+        result = _process_batch(["VOO"])
+
+        assert len(result.stats_data) == 1
+        assert result.stats_data[0]["spxSinceElection"] == 12.5
+        assert result.stats_data[0]["spxSinceInauguration"] == -3.0
+        assert self.mock_stats.compute_return_since.call_count == 2
+
 
 class TestStripIncompleteWeek:
 
@@ -1418,3 +1513,151 @@ class TestComputeMiscStats:
         result = _compute_misc_stats(stats)
         assert "pctAbove200dSMA" not in result
         assert "pctAbove200wSMA" not in result
+
+    def test_spx_returns_from_voo(self):
+        stats = [
+            {"symbol": "AAPL", "ytdPct": 5.0},
+            {"symbol": "VOO", "ytdPct": 8.0, "spxSinceElection": 12.5, "spxSinceInauguration": -3.0},
+        ]
+        result = _compute_misc_stats(stats)
+        assert result["spxSinceElection"] == 12.5
+        assert result["spxSinceInauguration"] == -3.0
+
+    def test_spx_returns_absent_without_voo(self):
+        stats = [{"symbol": "AAPL", "ytdPct": 5.0}]
+        result = _compute_misc_stats(stats)
+        assert "spxSinceElection" not in result
+        assert "spxSinceInauguration" not in result
+
+    def test_forward_pe_median_odd_count(self):
+        stats = [
+            {"forwardPE": 10.0},
+            {"forwardPE": 20.0},
+            {"forwardPE": 50.0},
+            {"forwardPE": 30.0},
+            {"forwardPE": 40.0},
+        ]
+        result = _compute_misc_stats(stats)
+        # Sorted: [10, 20, 30, 40, 50] -> median is 30
+        assert result["medianForwardPE"] == 30.0
+
+
+class TestAggregateResultsStats:
+
+    def setup_method(self):
+        self._read_patcher = patch("src.worker.app._read_json")
+        self._put_patcher = patch("src.worker.app._put_json")
+        self._manifest_patcher = patch("src.worker.app._update_manifest")
+        self.mock_read = self._read_patcher.start()
+        self.mock_put = self._put_patcher.start()
+        self.mock_manifest = self._manifest_patcher.start()
+
+    def teardown_method(self):
+        self._manifest_patcher.stop()
+        self._put_patcher.stop()
+        self._read_patcher.stop()
+
+    def test_stats_merged_and_sorted_by_symbol(self):
+        self.mock_read.side_effect = [
+            {**EMPTY_BATCH, "stats": [{"symbol": "MSFT", "close": 400.0}]},
+            {**EMPTY_BATCH, "stats": [{"symbol": "AAPL", "close": 200.0}]},
+        ]
+
+        _aggregate_results("b", "r", 2)
+
+        stats_put = next(
+            call for call in self.mock_put.call_args_list
+            if "latest-stats.json" in call[0][1]
+        )
+        stats_data = stats_put[0][2]["stats"]
+        assert len(stats_data) == 2
+        assert stats_data[0]["symbol"] == "AAPL"
+        assert stats_data[1]["symbol"] == "MSFT"
+
+    def test_writes_latest_stats_json(self):
+        self.mock_read.return_value = EMPTY_BATCH
+
+        _aggregate_results("mybucket", "2026-02-22", 1)
+
+        put_keys = [call[0][1] for call in self.mock_put.call_args_list]
+        assert "results/latest-stats.json" in put_keys
+
+    def test_latest_stats_json_has_misc_field(self):
+        self.mock_read.return_value = {
+            **EMPTY_BATCH,
+            "stats": [{"symbol": "A", "ytdPct": 5.0, "highPct": -2.0}],
+        }
+
+        _aggregate_results("b", "r", 1)
+
+        stats_put = next(
+            call for call in self.mock_put.call_args_list
+            if "latest-stats.json" in call[0][1]
+        )
+        assert "misc" in stats_put[0][2]
+        assert "stats" in stats_put[0][2]
+
+    def test_writes_latest_errors_json(self):
+        self.mock_read.return_value = {
+            **EMPTY_BATCH,
+            "errorDetails": [{"symbol": "BAD", "error": "fail"}],
+        }
+
+        _aggregate_results("mybucket", "2026-02-22", 1)
+
+        put_keys = [call[0][1] for call in self.mock_put.call_args_list]
+        assert "results/latest-errors.json" in put_keys
+
+    def test_errors_sorted_by_symbol(self):
+        self.mock_read.side_effect = [
+            {**EMPTY_BATCH, "errorDetails": [{"symbol": "ZZZ", "error": "a"}]},
+            {**EMPTY_BATCH, "errorDetails": [{"symbol": "AAA", "error": "b"}]},
+        ]
+
+        _aggregate_results("b", "r", 2)
+
+        errors_put = next(
+            call for call in self.mock_put.call_args_list
+            if "latest-errors.json" in call[0][1]
+        )
+        errors = errors_put[0][2]["errorDetails"]
+        assert len(errors) == 2
+        assert errors[0]["symbol"] == "AAA"
+        assert errors[1]["symbol"] == "ZZZ"
+
+    def test_day_below_merged_and_sorted_by_count_descending(self):
+        self.mock_read.side_effect = [
+            {**EMPTY_BATCH, "dayBelow": [{"symbol": "LOW", "count": 2}]},
+            {**EMPTY_BATCH, "dayBelow": [{"symbol": "HIGH", "count": 10}]},
+        ]
+
+        _aggregate_results("b", "r", 2)
+
+        below_data = self.mock_put.call_args_list[2][0][2]
+        assert len(below_data["dayBelow"]) == 2
+        assert below_data["dayBelow"][0]["symbol"] == "HIGH"
+        assert below_data["dayBelow"][1]["symbol"] == "LOW"
+
+    def test_month_below_merged_and_sorted(self):
+        self.mock_read.side_effect = [
+            {**EMPTY_BATCH, "monthBelow": [{"symbol": "LOW", "count": 1}]},
+            {**EMPTY_BATCH, "monthBelow": [{"symbol": "HIGH", "count": 5}]},
+        ]
+
+        _aggregate_results("b", "r", 2)
+
+        monthly_ba = self.mock_put.call_args_list[5][0][2]
+        assert monthly_ba["monthBelow"][0]["symbol"] == "HIGH"
+        assert monthly_ba["monthBelow"][1]["symbol"] == "LOW"
+
+    def test_quarter_below_merged_and_sorted(self):
+        self.mock_read.side_effect = [
+            {**EMPTY_BATCH, "quarterBelow": [{"symbol": "LOW", "count": 1}]},
+            {**EMPTY_BATCH, "quarterBelow": [{"symbol": "HIGH", "count": 5}]},
+        ]
+
+        _aggregate_results("b", "r", 2)
+
+        quarterly_ba = self.mock_put.call_args_list[7][0][2]
+        assert quarterly_ba["quarterBelow"][0]["symbol"] == "HIGH"
+        assert quarterly_ba["quarterBelow"][1]["symbol"] == "LOW"

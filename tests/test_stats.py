@@ -4,6 +4,7 @@ from src.worker.stats import (
     compute_ytd_pct,
     compute_highest_close_pct,
     compute_lowest_close_pct,
+    compute_return_since,
     compute_stats,
 )
 
@@ -299,3 +300,48 @@ class TestSma200:
         assert result is not None
         assert "sma200w" not in result
         assert "pctSma200w" not in result
+
+
+class TestComputeReturnSince:
+
+    def test_exact_date_match(self):
+        closes = [100.0, 110.0, 120.0]
+        timestamps = [
+            _ts(2024, 11, 5),
+            _ts(2024, 12, 1),
+            _ts(2025, 1, 2),
+        ]
+        # (120 - 100) / 100 * 100 = 20.0
+        assert compute_return_since(closes, timestamps, 2024, 11, 5) == 20.0
+
+    def test_finds_closest_within_3_days(self):
+        closes = [100.0, 110.0]
+        timestamps = [_ts(2024, 11, 4), _ts(2025, 1, 2)]
+        # Target is 11/5 but closest is 11/4 (1 day away)
+        result = compute_return_since(closes, timestamps, 2024, 11, 5)
+        assert result == 10.0
+
+    def test_no_match_beyond_3_days_returns_none(self):
+        closes = [100.0, 110.0]
+        timestamps = [_ts(2024, 1, 1), _ts(2025, 1, 2)]
+        assert compute_return_since(closes, timestamps, 2024, 11, 5) is None
+
+    def test_negative_return(self):
+        closes = [200.0, 180.0]
+        timestamps = [_ts(2025, 1, 20), _ts(2025, 3, 1)]
+        # (180 - 200) / 200 * 100 = -10.0
+        assert compute_return_since(closes, timestamps, 2025, 1, 20) == -10.0
+
+    def test_insufficient_data_returns_none(self):
+        assert compute_return_since([100.0], [_ts(2025, 1, 1)], 2025, 1, 1) is None
+
+    def test_zero_close_at_target_returns_none(self):
+        closes = [0.0, 110.0]
+        timestamps = [_ts(2025, 1, 20), _ts(2025, 3, 1)]
+        assert compute_return_since(closes, timestamps, 2025, 1, 20) is None
+
+    def test_rounded_to_2_decimals(self):
+        closes = [100.0, 133.33]
+        timestamps = [_ts(2025, 1, 20), _ts(2025, 3, 1)]
+        result = compute_return_since(closes, timestamps, 2025, 1, 20)
+        assert result == 33.33

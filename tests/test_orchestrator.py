@@ -1,8 +1,8 @@
 import json
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
-from src.orchestrator.app import lambda_handler, _detect_vix_spikes
+from src.orchestrator.app import lambda_handler, _detect_vix_spikes, _fetch_vix_spikes
 
 
 class TestLambdaHandler:
@@ -189,3 +189,89 @@ class TestDetectVixSpikes:
 
     def test_mismatched_lengths(self):
         assert _detect_vix_spikes([25.0], [1000, 2000]) == []
+
+
+class TestFetchVixSpikes:
+
+    @patch("src.orchestrator.app.urllib.request.urlopen")
+    def test_success_returns_spikes(self, mock_urlopen):
+        response_data = {
+            "chart": {
+                "result": [{
+                    "timestamp": [86400, 172800, 259200],
+                    "indicators": {"quote": [{"close": [15.0, 25.0, 15.0]}]},
+                }]
+            }
+        }
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(response_data).encode()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        result = _fetch_vix_spikes()
+
+        assert len(result) == 1
+        assert result[0]["vixClose"] == 25.0
+
+    @patch("src.orchestrator.app.urllib.request.urlopen")
+    def test_network_error_returns_empty(self, mock_urlopen):
+        mock_urlopen.side_effect = OSError("no network")
+
+        assert _fetch_vix_spikes() == []
+
+    @patch("src.orchestrator.app.urllib.request.urlopen")
+    def test_malformed_json_returns_empty(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b"not json"
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        assert _fetch_vix_spikes() == []
+
+    @patch("src.orchestrator.app.urllib.request.urlopen")
+    def test_missing_chart_key_returns_empty(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({"other": {}}).encode()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        assert _fetch_vix_spikes() == []
+
+    @patch("src.orchestrator.app.urllib.request.urlopen")
+    def test_all_null_closes_returns_empty(self, mock_urlopen):
+        response_data = {
+            "chart": {
+                "result": [{
+                    "timestamp": [1000, 2000],
+                    "indicators": {"quote": [{"close": [None, None]}]},
+                }]
+            }
+        }
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(response_data).encode()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        assert _fetch_vix_spikes() == []
+
+    @patch("src.orchestrator.app.urllib.request.urlopen")
+    def test_no_spikes_above_threshold_returns_empty(self, mock_urlopen):
+        response_data = {
+            "chart": {
+                "result": [{
+                    "timestamp": [1000, 2000, 3000],
+                    "indicators": {"quote": [{"close": [12.0, 15.0, 18.0]}]},
+                }]
+            }
+        }
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(response_data).encode()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        assert _fetch_vix_spikes() == []
