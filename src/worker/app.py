@@ -148,6 +148,24 @@ def _crossdown_entry(symbol: str, close: float, ema_value: float, periods_above:
     }
 
 
+def _append_timeframe_results(
+    batch: BatchResult,
+    result: dict[str, Optional[dict]],
+    cross_up_attr: str,
+    cross_down_attr: str,
+    below_attr: str,
+    above_attr: str,
+) -> None:
+    if result["crossover"] is not None:
+        getattr(batch, cross_up_attr).append(result["crossover"])
+    if result["crossdown"] is not None:
+        getattr(batch, cross_down_attr).append(result["crossdown"])
+    if result["below"] is not None:
+        getattr(batch, below_attr).append(result["below"])
+    if result["above"] is not None:
+        getattr(batch, above_attr).append(result["above"])
+
+
 def _process_batch(
     symbols: list[str],
     vix_spikes: Optional[list[dict]] = None,
@@ -174,35 +192,22 @@ def _process_batch(
         if daily_below is not None:
             batch.day_below.append(daily_below)
 
-        weekly = _process_weekly(symbol, monthly_result)
-        if weekly["crossover"] is not None:
-            batch.crossovers.append(weekly["crossover"])
-        if weekly["crossdown"] is not None:
-            batch.crossdowns.append(weekly["crossdown"])
-        if weekly["below"] is not None:
-            batch.week_below.append(weekly["below"])
-        if weekly["above"] is not None:
-            batch.week_above.append(weekly["above"])
+        weekly = _process_timeframe(
+            symbol, monthly_result, "weeksBelow", "weeksAbove",
+            min_below=MIN_WEEKS_THRESHOLD,
+        )
+        monthly = _process_timeframe(
+            symbol, monthly_result, "monthsBelow", "monthsAbove",
+            aggregate_fn=_aggregate_to_monthly,
+        )
+        quarterly = _process_timeframe(
+            symbol, quarterly_result, "quartersBelow", "quartersAbove",
+            aggregate_fn=_aggregate_to_quarterly,
+        )
 
-        monthly = _process_monthly(symbol, monthly_result)
-        if monthly["crossover"] is not None:
-            batch.month_crossovers.append(monthly["crossover"])
-        if monthly["crossdown"] is not None:
-            batch.month_crossdowns.append(monthly["crossdown"])
-        if monthly["below"] is not None:
-            batch.month_below.append(monthly["below"])
-        if monthly["above"] is not None:
-            batch.month_above.append(monthly["above"])
-
-        quarterly = _process_quarterly(symbol, quarterly_result)
-        if quarterly["crossover"] is not None:
-            batch.quarter_crossovers.append(quarterly["crossover"])
-        if quarterly["crossdown"] is not None:
-            batch.quarter_crossdowns.append(quarterly["crossdown"])
-        if quarterly["below"] is not None:
-            batch.quarter_below.append(quarterly["below"])
-        if quarterly["above"] is not None:
-            batch.quarter_above.append(quarterly["above"])
+        _append_timeframe_results(batch, weekly, "crossovers", "crossdowns", "week_below", "week_above")
+        _append_timeframe_results(batch, monthly, "month_crossovers", "month_crossdowns", "month_below", "month_above")
+        _append_timeframe_results(batch, quarterly, "quarter_crossovers", "quarter_crossdowns", "quarter_below", "quarter_above")
 
         if stats_result is not None:
             forward_pe, pe_history = yahoo.fetch_forward_pe(symbol)
@@ -256,126 +261,51 @@ def _process_daily(
     return above_entry, below_entry
 
 
-def _process_weekly(
+def _process_timeframe(
     symbol: str,
-    weekly_result: Optional[tuple[list[float], list[int]]],
+    candle_result: Optional[tuple[list[float], list[int]]],
+    cross_up_key: str,
+    cross_down_key: str,
+    aggregate_fn=None,
+    min_below: int = 0,
 ) -> dict[str, Optional[dict]]:
-    """Process weekly candles for a symbol.
+    """Process candles for a single timeframe (weekly/monthly/quarterly).
 
     Returns dict with keys: crossover, crossdown, below, above (each Optional[dict]).
     """
     empty = {"crossover": None, "crossdown": None, "below": None, "above": None}
-    if weekly_result is None:
+    if candle_result is None:
         return empty
-    closes, _ = _strip_incomplete_week(weekly_result[0], weekly_result[1])
+
+    closes, timestamps = _strip_incomplete_week(candle_result[0], candle_result[1])
+    if aggregate_fn is not None:
+        closes = aggregate_fn(closes, timestamps)
     ema_value = ema.calculate(closes)
     if ema_value is None:
         return empty
     last_close = closes[-1]
 
     crossover = None
-    crossover_weeks = ema.detect_weekly_crossover(closes)
-    if crossover_weeks is not None:
-        crossover = _crossover_entry(symbol, last_close, ema_value, crossover_weeks, "weeksBelow")
+    periods_below = ema.detect_weekly_crossover(closes)
+    if periods_below is not None:
+        crossover = _crossover_entry(symbol, last_close, ema_value, periods_below, cross_up_key)
 
     crossdown = None
-    crossdown_weeks = ema.detect_weekly_crossdown(closes)
-    if crossdown_weeks is not None:
-        crossdown = _crossdown_entry(symbol, last_close, ema_value, crossdown_weeks, "weeksAbove")
+    periods_above = ema.detect_weekly_crossdown(closes)
+    if periods_above is not None:
+        crossdown = _crossdown_entry(symbol, last_close, ema_value, periods_above, cross_down_key)
 
     below = None
-    weekly_below_count = ema.count_periods_below(closes)
-    if weekly_below_count is not None and weekly_below_count >= MIN_WEEKS_THRESHOLD:
-        below = _below_entry(symbol, last_close, ema_value, weekly_below_count)
+    below_count = ema.count_periods_below(closes)
+    if below_count is not None and below_count >= min_below:
+        below = _below_entry(symbol, last_close, ema_value, below_count)
 
     above = None
-    weekly_above_count = ema.count_periods_above(closes)
-    if weekly_above_count is not None:
-        above = _above_entry(symbol, last_close, ema_value, weekly_above_count)
+    above_count = ema.count_periods_above(closes)
+    if above_count is not None:
+        above = _above_entry(symbol, last_close, ema_value, above_count)
 
     return {"crossover": crossover, "crossdown": crossdown, "below": below, "above": above}
-
-
-def _process_monthly(
-    symbol: str,
-    monthly_result: Optional[tuple[list[float], list[int]]],
-) -> dict[str, Optional[dict]]:
-    """Process monthly candles for a symbol.
-
-    Returns dict with keys: crossover, crossdown, below, above (each Optional[dict]).
-    """
-    empty = {"crossover": None, "crossdown": None, "below": None, "above": None}
-    if monthly_result is None:
-        return empty
-    stripped_closes, stripped_timestamps = _strip_incomplete_week(monthly_result[0], monthly_result[1])
-    monthly_closes = _aggregate_to_monthly(stripped_closes, stripped_timestamps)
-    monthly_ema = ema.calculate(monthly_closes)
-    if monthly_ema is None:
-        return empty
-    last_monthly_close = monthly_closes[-1]
-
-    monthly_crossover_entry = None
-    monthly_crossover = ema.detect_weekly_crossover(monthly_closes)
-    if monthly_crossover is not None:
-        monthly_crossover_entry = _crossover_entry(symbol, last_monthly_close, monthly_ema, monthly_crossover, "monthsBelow")
-
-    monthly_crossdown_entry = None
-    monthly_crossdown = ema.detect_weekly_crossdown(monthly_closes)
-    if monthly_crossdown is not None:
-        monthly_crossdown_entry = _crossdown_entry(symbol, last_monthly_close, monthly_ema, monthly_crossdown, "monthsAbove")
-
-    below = None
-    monthly_below_count = ema.count_periods_below(monthly_closes)
-    if monthly_below_count is not None:
-        below = _below_entry(symbol, last_monthly_close, monthly_ema, monthly_below_count)
-
-    above = None
-    monthly_above_count = ema.count_periods_above(monthly_closes)
-    if monthly_above_count is not None:
-        above = _above_entry(symbol, last_monthly_close, monthly_ema, monthly_above_count)
-
-    return {"crossover": monthly_crossover_entry, "crossdown": monthly_crossdown_entry, "below": below, "above": above}
-
-
-def _process_quarterly(
-    symbol: str,
-    quarterly_result: Optional[tuple[list[float], list[int]]],
-) -> dict[str, Optional[dict]]:
-    """Process quarterly candles for a symbol.
-
-    Returns dict with keys: crossover, crossdown, below, above (each Optional[dict]).
-    """
-    empty = {"crossover": None, "crossdown": None, "below": None, "above": None}
-    if quarterly_result is None:
-        return empty
-    stripped_closes, stripped_timestamps = _strip_incomplete_week(quarterly_result[0], quarterly_result[1])
-    quarterly_closes = _aggregate_to_quarterly(stripped_closes, stripped_timestamps)
-    quarterly_ema = ema.calculate(quarterly_closes)
-    if quarterly_ema is None:
-        return empty
-    last_quarterly_close = quarterly_closes[-1]
-
-    quarterly_crossover_entry = None
-    quarterly_crossover = ema.detect_weekly_crossover(quarterly_closes)
-    if quarterly_crossover is not None:
-        quarterly_crossover_entry = _crossover_entry(symbol, last_quarterly_close, quarterly_ema, quarterly_crossover, "quartersBelow")
-
-    quarterly_crossdown_entry = None
-    quarterly_crossdown = ema.detect_weekly_crossdown(quarterly_closes)
-    if quarterly_crossdown is not None:
-        quarterly_crossdown_entry = _crossdown_entry(symbol, last_quarterly_close, quarterly_ema, quarterly_crossdown, "quartersAbove")
-
-    below = None
-    quarterly_below_count = ema.count_periods_below(quarterly_closes)
-    if quarterly_below_count is not None:
-        below = _below_entry(symbol, last_quarterly_close, quarterly_ema, quarterly_below_count)
-
-    above = None
-    quarterly_above_count = ema.count_periods_above(quarterly_closes)
-    if quarterly_above_count is not None:
-        above = _above_entry(symbol, last_quarterly_close, quarterly_ema, quarterly_above_count)
-
-    return {"crossover": quarterly_crossover_entry, "crossdown": quarterly_crossdown_entry, "below": below, "above": above}
 
 
 def _write_batch_results(
@@ -416,23 +346,47 @@ def _write_errors(bucket: str, run_id: str, batch_index: int, errors: list[dict]
     s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(errors))
 
 
+_AGGREGATE_KEYS = [
+    ("crossovers", "weeksBelow"),
+    ("crossdowns", "weeksAbove"),
+    ("dayBelow", "count"),
+    ("weekBelow", "count"),
+    ("dayAbove", "count"),
+    ("weekAbove", "count"),
+    ("monthCrossovers", "monthsBelow"),
+    ("monthCrossdowns", "monthsAbove"),
+    ("monthBelow", "count"),
+    ("monthAbove", "count"),
+    ("quarterCrossovers", "quartersBelow"),
+    ("quarterCrossdowns", "quartersAbove"),
+    ("quarterBelow", "count"),
+    ("quarterAbove", "count"),
+]
+
+_RESULT_FILES = [
+    ("", {"crossovers"}),
+    ("-crossdown", {"crossdowns"}),
+    ("-below", {"dayBelow", "weekBelow"}),
+    ("-above", {"dayAbove", "weekAbove"}),
+    ("-monthly", {"monthCrossovers", "monthCrossdowns"}),
+    ("-monthly-below-above", {"monthBelow", "monthAbove"}),
+    ("-quarterly", {"quarterCrossovers", "quarterCrossdowns"}),
+    ("-quarterly-below-above", {"quarterBelow", "quarterAbove"}),
+]
+
+
 def _aggregate_results(bucket: str, run_id: str, total_batches: int) -> None:
-    all_crossovers: list[dict] = []
-    all_crossdowns: list[dict] = []
-    all_day_below: list[dict] = []
-    all_week_below: list[dict] = []
-    all_day_above: list[dict] = []
-    all_week_above: list[dict] = []
-    all_month_crossovers: list[dict] = []
-    all_month_crossdowns: list[dict] = []
-    all_month_below: list[dict] = []
-    all_month_above: list[dict] = []
-    all_quarter_crossovers: list[dict] = []
-    all_quarter_crossdowns: list[dict] = []
-    all_quarter_below: list[dict] = []
-    all_quarter_above: list[dict] = []
-    all_stats: list[dict] = []
-    all_error_details: list[dict] = []
+    aggregated, total_symbols, total_errors = _read_batches(bucket, run_id, total_batches)
+    _sort_aggregated(aggregated)
+    _write_results(bucket, aggregated, total_symbols, total_errors)
+
+
+def _read_batches(
+    bucket: str, run_id: str, total_batches: int,
+) -> tuple[dict[str, list[dict]], int, int]:
+    aggregated: dict[str, list[dict]] = {key: [] for key, _ in _AGGREGATE_KEYS}
+    aggregated["stats"] = []
+    aggregated["errorDetails"] = []
     total_symbols = 0
     total_errors = 0
 
@@ -441,41 +395,24 @@ def _aggregate_results(bucket: str, run_id: str, total_batches: int) -> None:
         batch = _read_json(bucket, key)
         if batch is None:
             continue
-
-        all_crossovers.extend(batch.get("crossovers", []))
-        all_crossdowns.extend(batch.get("crossdowns", []))
-        all_day_below.extend(batch.get("dayBelow", []))
-        all_week_below.extend(batch.get("weekBelow", []))
-        all_day_above.extend(batch.get("dayAbove", []))
-        all_week_above.extend(batch.get("weekAbove", []))
-        all_month_crossovers.extend(batch.get("monthCrossovers", []))
-        all_month_crossdowns.extend(batch.get("monthCrossdowns", []))
-        all_month_below.extend(batch.get("monthBelow", []))
-        all_month_above.extend(batch.get("monthAbove", []))
-        all_quarter_crossovers.extend(batch.get("quarterCrossovers", []))
-        all_quarter_crossdowns.extend(batch.get("quarterCrossdowns", []))
-        all_quarter_below.extend(batch.get("quarterBelow", []))
-        all_quarter_above.extend(batch.get("quarterAbove", []))
-        all_stats.extend(batch.get("stats", []))
-        all_error_details.extend(batch.get("errorDetails", []))
+        for json_key, _ in _AGGREGATE_KEYS:
+            aggregated[json_key].extend(batch.get(json_key, []))
+        aggregated["stats"].extend(batch.get("stats", []))
+        aggregated["errorDetails"].extend(batch.get("errorDetails", []))
         total_symbols += batch.get("symbolsProcessed", 0)
         total_errors += batch.get("errors", 0)
 
-    all_crossovers.sort(key=lambda x: x.get("weeksBelow", 0), reverse=True)
-    all_crossdowns.sort(key=lambda x: x.get("weeksAbove", 0), reverse=True)
-    all_day_below.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_week_below.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_day_above.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_week_above.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_month_crossovers.sort(key=lambda x: x.get("monthsBelow", 0), reverse=True)
-    all_month_crossdowns.sort(key=lambda x: x.get("monthsAbove", 0), reverse=True)
-    all_month_below.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_month_above.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_quarter_crossovers.sort(key=lambda x: x.get("quartersBelow", 0), reverse=True)
-    all_quarter_crossdowns.sort(key=lambda x: x.get("quartersAbove", 0), reverse=True)
-    all_quarter_below.sort(key=lambda x: x.get("count", 0), reverse=True)
-    all_quarter_above.sort(key=lambda x: x.get("count", 0), reverse=True)
+    return aggregated, total_symbols, total_errors
 
+
+def _sort_aggregated(aggregated: dict[str, list[dict]]) -> None:
+    for json_key, sort_field in _AGGREGATE_KEYS:
+        aggregated[json_key].sort(key=lambda x, f=sort_field: x.get(f, 0), reverse=True)
+
+
+def _write_results(
+    bucket: str, aggregated: dict[str, list[dict]], total_symbols: int, total_errors: int,
+) -> None:
     now = datetime.now(timezone.utc)
     scan_date = now.strftime("%Y-%m-%d")
     scan_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -487,37 +424,22 @@ def _aggregate_results(bucket: str, run_id: str, total_batches: int) -> None:
         "errors": total_errors,
     }
 
-    crossover_result = {**base, "crossovers": all_crossovers}
-    crossdown_result = {**base, "crossdowns": all_crossdowns}
-    below_result = {**base, "dayBelow": all_day_below, "weekBelow": all_week_below}
-    above_result = {**base, "dayAbove": all_day_above, "weekAbove": all_week_above}
-    monthly_result = {**base, "monthCrossovers": all_month_crossovers, "monthCrossdowns": all_month_crossdowns}
-    monthly_ba_result = {**base, "monthBelow": all_month_below, "monthAbove": all_month_above}
-    quarterly_result = {**base, "quarterCrossovers": all_quarter_crossovers, "quarterCrossdowns": all_quarter_crossdowns}
-    quarterly_ba_result = {**base, "quarterBelow": all_quarter_below, "quarterAbove": all_quarter_above}
+    results_by_suffix = {}
+    for suffix, keys in _RESULT_FILES:
+        results_by_suffix[suffix] = {**base, **{k: aggregated[k] for k in keys}}
 
-    _put_json(bucket, "results/latest.json", crossover_result)
-    _put_json(bucket, "results/latest-crossdown.json", crossdown_result)
-    _put_json(bucket, "results/latest-below.json", below_result)
-    _put_json(bucket, "results/latest-above.json", above_result)
-    _put_json(bucket, "results/latest-monthly.json", monthly_result)
-    _put_json(bucket, "results/latest-monthly-below-above.json", monthly_ba_result)
-    _put_json(bucket, "results/latest-quarterly.json", quarterly_result)
-    _put_json(bucket, "results/latest-quarterly-below-above.json", quarterly_ba_result)
-    all_error_details.sort(key=lambda x: x.get("symbol", ""))
-    _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": all_error_details})
-    _put_json(bucket, f"results/{scan_date}.json", crossover_result)
-    _put_json(bucket, f"results/{scan_date}-crossdown.json", crossdown_result)
-    _put_json(bucket, f"results/{scan_date}-below.json", below_result)
-    _put_json(bucket, f"results/{scan_date}-above.json", above_result)
-    _put_json(bucket, f"results/{scan_date}-monthly.json", monthly_result)
-    _put_json(bucket, f"results/{scan_date}-monthly-below-above.json", monthly_ba_result)
-    _put_json(bucket, f"results/{scan_date}-quarterly.json", quarterly_result)
-    _put_json(bucket, f"results/{scan_date}-quarterly-below-above.json", quarterly_ba_result)
+    for suffix, _ in _RESULT_FILES:
+        _put_json(bucket, f"results/latest{suffix}.json", results_by_suffix[suffix])
 
-    all_stats.sort(key=lambda x: x.get("symbol", ""))
-    misc = _compute_misc_stats(all_stats, len(all_week_above), total_symbols)
-    stats_result = {**base, "stats": all_stats, "misc": misc}
+    aggregated["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
+    _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": aggregated["errorDetails"]})
+
+    for suffix, _ in _RESULT_FILES:
+        _put_json(bucket, f"results/{scan_date}{suffix}.json", results_by_suffix[suffix])
+
+    aggregated["stats"].sort(key=lambda x: x.get("symbol", ""))
+    misc = _compute_misc_stats(aggregated["stats"], len(aggregated["weekAbove"]), total_symbols)
+    stats_result = {**base, "stats": aggregated["stats"], "misc": misc}
     _put_json(bucket, "results/latest-stats.json", stats_result)
     _put_json(bucket, f"results/{scan_date}-stats.json", stats_result)
 

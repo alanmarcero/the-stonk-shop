@@ -943,6 +943,22 @@ function debounce(fn, delay) {
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
 }
 
+function resetTabState() {
+  state.tabCountCache = {};
+  state.showAllRows = false;
+}
+
+function switchToTab(tabId) {
+  state.activeTab = tabId;
+  state.sortCol = null;
+  state.sortAsc = true;
+  resetTabState();
+  closeAllDropdowns();
+  writeHash();
+  renderTabs();
+  showTab(state.activeTab);
+}
+
 function sortQuarterKeys(keys) {
   // Newest first (e.g. Q4'25, Q3'25, Q2'25, Q1'25, Q4'24...)
   return [...keys].sort((a, b) => {
@@ -999,7 +1015,7 @@ function renderSourceToggles() {
         else cur.add(id);
         state.activeSourceMode = cur.size > 0 ? cur : 'all';
       }
-      state.tabCountCache = {};
+      resetTabState();
       renderSourceToggles();
       renderTabs();
       showTab(state.activeTab);
@@ -1093,13 +1109,13 @@ function renderToolbar(filteredCount, totalCount) {
       }
     }
     state.activeQuickFilters.clear();
-    state.tabCountCache = {};
+    resetTabState();
     renderTabs();
     showTab(state.activeTab);
   });
   document.getElementById('clear-filters-btn').addEventListener('click', () => {
     clearAllFilters();
-    state.tabCountCache = {};
+    resetTabState();
     renderTabs();
     showTab(state.activeTab);
   });
@@ -1129,7 +1145,7 @@ function renderToolbar(filteredCount, totalCount) {
           state.activeColorFilters.add(cfId);
         }
       }
-      state.tabCountCache = {};
+      resetTabState();
       renderTabs();
       showTab(state.activeTab);
     });
@@ -1139,10 +1155,10 @@ function renderToolbar(filteredCount, totalCount) {
 /* ── Sorting ── */
 
 function sortRows(rows) {
-  if (!state.sortCol) return rows;
+  if (!state.sortCol) return;
   const col = state.sortCol;
   const asc = state.sortAsc;
-  return rows.sort((rowA, rowB) => {
+  rows.sort((rowA, rowB) => {
     const valA = rowA[col], valB = rowB[col];
     if (typeof valA === 'number' && typeof valB === 'number') return asc ? valA - valB : valB - valA;
     return asc ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
@@ -1334,31 +1350,9 @@ function renderTabs() {
     });
   });
 
-  // Tab click inside dropdown
-  el.querySelectorAll('.tab-dropdown .tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      state.activeTab = tab.dataset.tab;
-      state.sortCol = null;
-      state.sortAsc = true;
-      state.showAllRows = false;
-      closeAllDropdowns();
-      writeHash();
-      renderTabs();
-      showTab(state.activeTab);
-    });
-  });
-
-  // Standalone tab click
-  el.querySelectorAll('.tab.standalone').forEach(tab => {
-    tab.addEventListener('click', () => {
-      state.activeTab = tab.dataset.tab;
-      state.sortCol = null;
-      state.sortAsc = true;
-      state.showAllRows = false;
-      writeHash();
-      renderTabs();
-      showTab(state.activeTab);
-    });
+  // Tab clicks (both dropdown and standalone)
+  el.querySelectorAll('.tab[data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => switchToTab(tab.dataset.tab));
   });
 }
 
@@ -1458,8 +1452,7 @@ function attachFilterListeners(def, tabId) {
       const input = btn.closest('.num-filter-group').querySelector('input');
       if (input) input.value = state.filters[col][bound];
       state.lowSignalActive = false;
-      state.showAllRows = false;
-      state.tabCountCache = {};
+      resetTabState();
       renderTabs();
       updateRows(tabId);
     });

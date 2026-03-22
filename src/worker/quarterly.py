@@ -4,10 +4,6 @@ from typing import Optional
 
 QUARTER_END_MONTHS = {3, 6, 9, 12}
 
-QUARTER_LABELS = {
-    (3,): "Q1", (6,): "Q2", (9,): "Q3", (12,): "Q4",
-}
-
 
 def compute_quarterly_changes(
     closes: list[float], timestamps: list[int]
