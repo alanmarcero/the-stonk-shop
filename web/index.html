@@ -182,9 +182,7 @@
 
   .tab-dropdown {
     display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
+    position: fixed;
     z-index: 100;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
@@ -1289,7 +1287,13 @@ function renderTabs() {
       const group = btn.parentElement;
       const wasOpen = group.classList.contains('open');
       closeAllDropdowns();
-      if (!wasOpen) group.classList.add('open');
+      if (!wasOpen) {
+        const rect = btn.getBoundingClientRect();
+        const dropdown = group.querySelector('.tab-dropdown');
+        dropdown.style.top = rect.bottom + 'px';
+        dropdown.style.left = rect.left + 'px';
+        group.classList.add('open');
+      }
     });
   });
 
