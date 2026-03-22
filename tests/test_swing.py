@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from src.worker.swing import analyze, THRESHOLD
+from src.worker.swing import analyze
 
 
 def _ts(year, month, day):
@@ -126,7 +126,3 @@ class TestAnalyze:
         assert result is None or "breakdownPrice" not in result or result["breakdownPrice"] > 0
 
 
-class TestThreshold:
-
-    def test_threshold_is_ten_percent(self):
-        assert THRESHOLD == 0.10

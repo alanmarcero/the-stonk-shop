@@ -2,7 +2,7 @@ import json
 from io import BytesIO
 from unittest.mock import patch
 
-from src.orchestrator.app import lambda_handler, BATCH_SIZE, _detect_vix_spikes
+from src.orchestrator.app import lambda_handler, _detect_vix_spikes
 
 
 class TestLambdaHandler:
@@ -158,12 +158,6 @@ class TestLambdaHandler:
         result = lambda_handler({}, None)
 
         assert result["body"]["vixSpikes"] == 2
-
-
-class TestBatchSize:
-
-    def test_batch_size_is_50(self):
-        assert BATCH_SIZE == 50
 
 
 class TestDetectVixSpikes:

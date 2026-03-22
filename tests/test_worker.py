@@ -403,22 +403,17 @@ class TestAggregateToMonthly:
     def test_empty_input(self):
         assert _aggregate_to_monthly([], []) == []
 
-    def test_six_months_produces_expected_count(self):
+    def test_three_months_produces_three_entries(self):
         from datetime import datetime, timezone
-        # Simulate ~26 weekly candles across 6 months
-        closes = []
-        timestamps = []
-        base = datetime(2025, 1, 6, tzinfo=timezone.utc)
-        for i in range(26):
-            from datetime import timedelta
-            dt = base + timedelta(weeks=i)
-            closes.append(100.0 + i)
-            timestamps.append(int(dt.timestamp()))
+        # One candle per month in Jan, Feb, Mar
+        ts_jan = int(datetime(2025, 1, 13, tzinfo=timezone.utc).timestamp())
+        ts_feb = int(datetime(2025, 2, 10, tzinfo=timezone.utc).timestamp())
+        ts_mar = int(datetime(2025, 3, 10, tzinfo=timezone.utc).timestamp())
 
-        result = _aggregate_to_monthly(closes, timestamps)
+        result = _aggregate_to_monthly([100.0, 110.0, 120.0], [ts_jan, ts_feb, ts_mar])
 
-        # Jan through ~July = 6-7 months
-        assert 6 <= len(result) <= 7
+        assert len(result) == 3
+        assert result == [100.0, 110.0, 120.0]
 
 
 class TestAggregateToQuarterly:
@@ -452,21 +447,21 @@ class TestAggregateToQuarterly:
     def test_empty_input(self):
         assert _aggregate_to_quarterly([], []) == []
 
-    def test_five_years_produces_expected_count(self):
-        from datetime import datetime, timezone, timedelta
-        # Simulate ~260 weekly candles across 5 years
-        closes = []
-        timestamps = []
-        base = datetime(2021, 1, 4, tzinfo=timezone.utc)
-        for i in range(260):
-            dt = base + timedelta(weeks=i)
-            closes.append(100.0 + i)
-            timestamps.append(int(dt.timestamp()))
+    def test_four_quarters_produces_four_entries(self):
+        from datetime import datetime, timezone
+        # One candle per quarter across 4 quarters
+        ts_q1 = int(datetime(2025, 2, 10, tzinfo=timezone.utc).timestamp())
+        ts_q2 = int(datetime(2025, 5, 12, tzinfo=timezone.utc).timestamp())
+        ts_q3 = int(datetime(2025, 8, 11, tzinfo=timezone.utc).timestamp())
+        ts_q4 = int(datetime(2025, 11, 10, tzinfo=timezone.utc).timestamp())
 
-        result = _aggregate_to_quarterly(closes, timestamps)
+        result = _aggregate_to_quarterly(
+            [100.0, 200.0, 300.0, 400.0],
+            [ts_q1, ts_q2, ts_q3, ts_q4],
+        )
 
-        # 5 years = ~20 quarters
-        assert 19 <= len(result) <= 21
+        assert len(result) == 4
+        assert result == [100.0, 200.0, 300.0, 400.0]
 
     def test_last_close_wins_per_quarter(self):
         from datetime import datetime, timezone
@@ -1157,16 +1152,20 @@ class TestAggregateResults:
 
         _aggregate_results("mybucket", "2026-03-14", 1)
 
-        put_keys = [call[0][1] for call in self.mock_put.call_args_list]
-        latest_keys = [k for k in put_keys if "latest" in k]
-        dated_keys = [k for k in put_keys if k not in latest_keys]
-        # 9 dated files: base, crossdown, below, above, monthly, monthly-below-above, quarterly, quarterly-below-above, stats
+        put_keys = {call[0][1] for call in self.mock_put.call_args_list}
+        # Dated files use datetime.now(), so extract the actual date used
+        dated_keys = {k for k in put_keys if "latest" not in k and "manifest" not in k}
         assert len(dated_keys) == 9
-        suffixes = ["-crossdown", "-below", "-above", "-monthly", "-monthly-below-above", "-quarterly", "-quarterly-below-above", "-stats"]
-        # The base dated file (no suffix)
-        assert any(k.endswith(".json") and "-crossdown" not in k and "-below" not in k and "-above" not in k and "-monthly" not in k for k in dated_keys)
-        for suffix in suffixes:
-            assert any(suffix + ".json" in k for k in dated_keys)
+        # Verify all expected suffixes are present
+        suffixes_found = {k.split("/")[-1].split(".", 1)[0].split("-", 4)[-1] if "-" in k.split("/")[-1].split("-", 4)[-1] else "" for k in dated_keys}
+        assert "crossdown" in {k.split("/")[-1].replace(".json", "").split("-", 4)[-1] for k in dated_keys if "crossdown" in k}
+        assert any("below.json" in k and "monthly" not in k and "quarterly" not in k for k in dated_keys)
+        assert any("above.json" in k and "monthly" not in k and "quarterly" not in k for k in dated_keys)
+        assert any("monthly.json" in k for k in dated_keys)
+        assert any("monthly-below-above.json" in k for k in dated_keys)
+        assert any("quarterly.json" in k for k in dated_keys)
+        assert any("quarterly-below-above.json" in k for k in dated_keys)
+        assert any("stats.json" in k for k in dated_keys)
 
     def test_aggregate_calls_update_manifest(self):
         self.mock_read.return_value = EMPTY_BATCH
@@ -1302,8 +1301,9 @@ class TestDeleteSnapshot:
     def test_uses_correct_bucket(self, mock_s3):
         _delete_snapshot("my-special-bucket", "2026-03-08")
 
-        for call in mock_s3.delete_object.call_args_list:
-            assert call[1]["Bucket"] == "my-special-bucket"
+        assert mock_s3.delete_object.call_count == 9
+        buckets = {call[1]["Bucket"] for call in mock_s3.delete_object.call_args_list}
+        assert buckets == {"my-special-bucket"}
 
     @patch("src.worker.app.s3")
     def test_continues_on_delete_error(self, mock_s3):

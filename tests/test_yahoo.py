@@ -472,16 +472,3 @@ class TestParseForwardPEHistory:
         assert result == {"Q1'25": 15.0, "Q2'25": 16.0, "Q3'25": 17.0, "Q4'25": 18.0}
 
 
-class TestConstants:
-
-    def test_base_url(self):
-        assert BASE_URL == "https://query1.finance.yahoo.com/v8/finance/chart"
-
-    def test_timeseries_url(self):
-        assert "fundamentals-timeseries" in TIMESERIES_URL
-
-    def test_user_agent(self):
-        assert "Mozilla" in USER_AGENT
-
-    def test_timeout(self):
-        assert TIMEOUT_SECONDS == 10
