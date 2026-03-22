@@ -790,8 +790,8 @@
     td { padding: 3px 3px; }
     .filter-row td { padding: 2px 2px; position: static; }
     .num-filter-group { height: 26px; }
-    .spin-btn { width: 20px; font-size: 10px; }
-    .filter-row input.filter-num { width: 28px; font-size: 9px; }
+    .spin-btn { width: 22px; font-size: 10px; }
+    .filter-row input.filter-num { width: 36px; font-size: 9px; }
     .filter-row input.filter-symbol { font-size: 9px; min-height: 26px; }
     .stat-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
     .stat-card { padding: 12px 12px; }
@@ -934,7 +934,14 @@ const state = {
   dynPctCols: new Set(),
   dynPECols: new Set(),
   dynPEPrevCol: {},
+  tabCountCache: {},
+  showAllRows: false,
 };
+
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+}
 
 function sortQuarterKeys(keys) {
   // Newest first (e.g. Q4'25, Q3'25, Q2'25, Q1'25, Q4'24...)
@@ -992,6 +999,7 @@ function renderSourceToggles() {
         else cur.add(id);
         state.activeSourceMode = cur.size > 0 ? cur : 'all';
       }
+      state.tabCountCache = {};
       renderSourceToggles();
       renderTabs();
       showTab(state.activeTab);
@@ -1085,11 +1093,13 @@ function renderToolbar(filteredCount, totalCount) {
       }
     }
     state.activeQuickFilters.clear();
+    state.tabCountCache = {};
     renderTabs();
     showTab(state.activeTab);
   });
   document.getElementById('clear-filters-btn').addEventListener('click', () => {
     clearAllFilters();
+    state.tabCountCache = {};
     renderTabs();
     showTab(state.activeTab);
   });
@@ -1119,6 +1129,7 @@ function renderToolbar(filteredCount, totalCount) {
           state.activeColorFilters.add(cfId);
         }
       }
+      state.tabCountCache = {};
       renderTabs();
       showTab(state.activeTab);
     });
@@ -1213,11 +1224,18 @@ function renderRowHTML(row, cols, pctField, tabId) {
   }).join('') + '</tr>';
 }
 
+const ROW_RENDER_LIMIT = 500;
+
 function renderTbodyHTML(rows, cols, pctField, tabId) {
   if (rows.length === 0) {
     return `<tr><td colspan="${cols.length}" style="text-align:center;padding:32px;color:var(--text-muted);font-family:var(--font-ui)">No data</td></tr>`;
   }
-  return rows.map(row => renderRowHTML(row, cols, pctField, tabId)).join('');
+  const limit = state.showAllRows ? rows.length : Math.min(rows.length, ROW_RENDER_LIMIT);
+  let html = rows.slice(0, limit).map(row => renderRowHTML(row, cols, pctField, tabId)).join('');
+  if (limit < rows.length) {
+    html += `<tr class="show-all-row"><td colspan="${cols.length}" style="text-align:center;padding:16px;color:var(--accent);cursor:pointer;font-family:var(--font-ui);font-size:13px">Show all ${rows.length.toLocaleString()} rows (${(rows.length - limit).toLocaleString()} more)</td></tr>`;
+  }
+  return html;
 }
 
 /* ── Tabs ── */
@@ -1234,6 +1252,18 @@ function getTabCount(t) {
   const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
     Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null));
   return hasFilter ? `${filtered} / ${total}` : `${total}`;
+}
+
+function getTabCountCached(t) {
+  if (t.id === state.activeTab) {
+    const count = getTabCount(t);
+    state.tabCountCache[t.id] = count;
+    return count;
+  }
+  if (state.tabCountCache[t.id] != null) return state.tabCountCache[t.id];
+  const count = getTabCount(t);
+  state.tabCountCache[t.id] = count;
+  return count;
 }
 
 function renderTabs() {
@@ -1253,7 +1283,7 @@ function renderTabs() {
       else btnCls += ' active';
     }
 
-    const countText = activeInGroup ? getTabCount(activeInGroup) : '';
+    const countText = activeInGroup ? getTabCountCached(activeInGroup) : '';
     const countSpan = countText ? `<span class="count">${countText}</span>` : '';
 
     html += `<div class="tab-group">`;
@@ -1262,7 +1292,7 @@ function renderTabs() {
     for (const t of groupTabDefs) {
       const isActive = t.id === state.activeTab;
       const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
-      const tabCount = getTabCount(t);
+      const tabCount = getTabCountCached(t);
       const tabCountSpan = tabCount ? `<span class="count">${tabCount}</span>` : '';
       html += `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${tabCountSpan}</div>`;
     }
@@ -1273,7 +1303,7 @@ function renderTabs() {
   for (const t of STANDALONE_TABS) {
     const isActive = t.id === state.activeTab;
     const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
-    const countText = getTabCount(t);
+    const countText = getTabCountCached(t);
     const countSpan = countText ? `<span class="count">${countText}</span>` : '';
     html += `<div class="tab standalone${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${countSpan}</div>`;
   }
@@ -1290,9 +1320,16 @@ function renderTabs() {
       if (!wasOpen) {
         const rect = btn.getBoundingClientRect();
         const dropdown = group.querySelector('.tab-dropdown');
-        dropdown.style.top = rect.bottom + 'px';
-        dropdown.style.left = rect.left + 'px';
         group.classList.add('open');
+        const ddRect = dropdown.getBoundingClientRect();
+        let top = rect.bottom;
+        let left = rect.left;
+        if (left + ddRect.width > window.innerWidth - 8) left = window.innerWidth - ddRect.width - 8;
+        if (left < 8) left = 8;
+        if (top + ddRect.height > window.innerHeight - 8) top = rect.top - ddRect.height;
+        if (top < 8) top = 8;
+        dropdown.style.top = top + 'px';
+        dropdown.style.left = left + 'px';
       }
     });
   });
@@ -1303,6 +1340,7 @@ function renderTabs() {
       state.activeTab = tab.dataset.tab;
       state.sortCol = null;
       state.sortAsc = true;
+      state.showAllRows = false;
       closeAllDropdowns();
       writeHash();
       renderTabs();
@@ -1316,6 +1354,7 @@ function renderTabs() {
       state.activeTab = tab.dataset.tab;
       state.sortCol = null;
       state.sortAsc = true;
+      state.showAllRows = false;
       writeHash();
       renderTabs();
       showTab(state.activeTab);
@@ -1379,10 +1418,22 @@ function attachFilterListeners(def, tabId) {
       const col = th.dataset.col;
       if (state.sortCol === col) state.sortAsc = !state.sortAsc;
       else { state.sortCol = col; state.sortAsc = NUM_COLS.has(col) ? false : true; }
-      showTab(tabId);
+      state.showAllRows = false;
+      document.querySelectorAll('th[data-col]').forEach(h => {
+        const isSorted = state.sortCol === h.dataset.col;
+        h.classList.toggle('sorted', isSorted);
+        const arrow = h.querySelector('.sort-arrow');
+        if (arrow) arrow.textContent = isSorted ? (state.sortAsc ? '\u25B2' : '\u25BC') : '\u25B4';
+      });
+      updateRows(tabId);
     })
   );
 
+  const debouncedFilterUpdate = debounce(() => {
+    state.showAllRows = false;
+    renderTabs();
+    updateRows(tabId);
+  }, 150);
   document.querySelectorAll('.filter-row input').forEach(input => {
     input.addEventListener('input', () => {
       const col = input.dataset.col;
@@ -1395,8 +1446,7 @@ function attachFilterListeners(def, tabId) {
         state.filters[col][bound] = input.value;
       }
       state.lowSignalActive = false;
-      renderTabs();
-      updateRows(tabId);
+      debouncedFilterUpdate();
     });
   });
 
@@ -1415,6 +1465,18 @@ function attachFilterListeners(def, tabId) {
       updateRows(tabId);
     });
   });
+}
+
+function attachShowAllListener(tabId) {
+  const el = document.querySelector('.show-all-row');
+  if (el) el.addEventListener('click', () => { state.showAllRows = true; updateRows(tabId); });
+}
+
+function updateRowCount(filteredCount, totalCount) {
+  const el = document.querySelector('.row-count');
+  if (!el) return false;
+  el.innerHTML = `Showing <strong>${filteredCount}</strong> of <strong>${totalCount}</strong>`;
+  return true;
 }
 
 /* ── Main tab display ── */
@@ -1439,6 +1501,7 @@ function renderSortableTable(tabId, cols) {
     `</table></div>`;
 
   attachFilterListeners(def, tabId);
+  attachShowAllListener(tabId);
 }
 
 function showTab(tabId) {
@@ -1466,11 +1529,12 @@ function updateRows(tabId) {
   sortRows(rows);
 
   const totalSourced = allRows.filter(r => matchesSources(r.symbol)).length;
-  renderToolbar(rows.length, totalSourced);
+  if (!updateRowCount(rows.length, totalSourced)) renderToolbar(rows.length, totalSourced);
 
   const tbody = document.querySelector('.table-wrap tbody');
   if (!tbody) return;
   tbody.innerHTML = renderTbodyHTML(rows, cols, def.pctField, tabId);
+  attachShowAllListener(tabId);
 }
 
 /* ── Formatting ── */
@@ -1491,6 +1555,7 @@ function esc(s) {
 }
 
 function populateTabData(byUrl) {
+  state.tabCountCache = {};
   TAB_DEFS.forEach(t => {
     if (t.special) return;
     const json = byUrl[t.file];
