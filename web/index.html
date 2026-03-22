@@ -1510,7 +1510,7 @@ function showTab(tabId) {
 }
 
 const SPECIAL_TAB_COLS = {
-  performance: ['symbol','close','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE'],
+  performance: ['symbol','close','ytdPct','highPct','lowPct','rsi','forwardPE'],
   priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct','rsi'],
 };
 
@@ -1742,8 +1742,8 @@ function buildSpecialTabData() {
   // Performance
   state.data['performance'] = stats.map(s => ({
     symbol: s.symbol, close: s.close ?? null,
-    ytdPct: s.ytdPct ?? null, highPct: s.highPct ?? null, high3yr: s.high3yr ?? null,
-    lowPct: s.lowPct ?? null, low52wk: s.low52wk ?? null,
+    ytdPct: s.ytdPct ?? null, highPct: s.highPct ?? null,
+    lowPct: s.lowPct ?? null,
     rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
   }));
 
