@@ -488,6 +488,17 @@ def _compute_misc_stats(
         misc["pctAbove5wkEMA"] = round(week_above_count / total_symbols * 100, 1)
         misc["pctBelow5wkEMA"] = round((total_symbols - week_above_count) / total_symbols * 100, 1)
 
+    # SMA breadth
+    above_200d = sum(1 for s in all_stats if s.get("pctSma200d") is not None and s["pctSma200d"] >= 0)
+    has_200d = sum(1 for s in all_stats if s.get("pctSma200d") is not None)
+    if has_200d > 0:
+        misc["pctAbove200dSMA"] = round(above_200d / has_200d * 100, 1)
+
+    above_200w = sum(1 for s in all_stats if s.get("pctSma200w") is not None and s["pctSma200w"] >= 0)
+    has_200w = sum(1 for s in all_stats if s.get("pctSma200w") is not None)
+    if has_200w > 0:
+        misc["pctAbove200wSMA"] = round(above_200w / has_200w * 100, 1)
+
     # SPX milestone returns (from VOO)
     voo = next((s for s in all_stats if s.get("symbol") == "VOO"), None)
     if voo:

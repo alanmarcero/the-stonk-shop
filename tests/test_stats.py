@@ -276,7 +276,6 @@ class TestSma200:
         expected_sma = round(sum(weekly_closes[-200:]) / 200, 2)
         assert result["sma200w"] == expected_sma
         assert "pctSma200w" in result
-        # pct should be relative to current daily close
         expected_pct = round((closes[-1] - expected_sma) / expected_sma * 100, 2)
         assert result["pctSma200w"] == expected_pct
 

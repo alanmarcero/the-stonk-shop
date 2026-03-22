@@ -1391,3 +1391,30 @@ class TestComputeMiscStats:
         result = _compute_misc_stats(stats, week_above_count=0, total_symbols=0)
         assert "pctAbove5wkEMA" not in result
         assert "pctBelow5wkEMA" not in result
+
+    def test_pct_above_200d_sma(self):
+        stats = [
+            {"pctSma200d": 5.0},
+            {"pctSma200d": -3.0},
+            {"pctSma200d": 0.0},
+        ]
+        result = _compute_misc_stats(stats)
+        # 2 out of 3 are >= 0
+        assert result["pctAbove200dSMA"] == 66.7
+
+    def test_pct_above_200w_sma(self):
+        stats = [
+            {"pctSma200w": 10.0},
+            {"pctSma200w": -5.0},
+            {"pctSma200w": 2.0},
+            {"pctSma200w": -1.0},
+        ]
+        result = _compute_misc_stats(stats)
+        # 2 out of 4 are >= 0
+        assert result["pctAbove200wSMA"] == 50.0
+
+    def test_no_sma_data_omits_sma_fields(self):
+        stats = [{"ytdPct": 5.0}]
+        result = _compute_misc_stats(stats)
+        assert "pctAbove200dSMA" not in result
+        assert "pctAbove200wSMA" not in result
