@@ -1408,10 +1408,6 @@ function renderFilterRow(def) {
   }).join('');
 }
 
-function renderTableBody(def, rows, tabId) {
-  return renderTbodyHTML(rows, def.cols, def.pctField, tabId);
-}
-
 function attachFilterListeners(def, tabId) {
   document.querySelectorAll('th[data-col]').forEach(th =>
     th.addEventListener('click', () => {
@@ -1430,6 +1426,7 @@ function attachFilterListeners(def, tabId) {
   );
 
   const debouncedFilterUpdate = debounce(() => {
+    if (state.activeTab !== tabId) return;
     state.showAllRows = false;
     renderTabs();
     updateRows(tabId);
@@ -1461,6 +1458,8 @@ function attachFilterListeners(def, tabId) {
       const input = btn.closest('.num-filter-group').querySelector('input');
       if (input) input.value = state.filters[col][bound];
       state.lowSignalActive = false;
+      state.showAllRows = false;
+      state.tabCountCache = {};
       renderTabs();
       updateRows(tabId);
     });
