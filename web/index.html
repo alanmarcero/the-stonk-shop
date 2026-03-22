@@ -124,21 +124,30 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    align-items: stretch;
   }
 
   .tabs::-webkit-scrollbar { display: none; }
 
-  .tab {
+  /* ── Tab Group (dropdown) ── */
+  .tab-group {
+    position: relative;
+  }
+
+  .tab-group-btn {
     padding: 10px 16px;
     min-height: 42px;
     display: flex;
     align-items: center;
+    gap: 5px;
     cursor: pointer;
     font-family: var(--font-ui);
     font-size: 12.5px;
     font-weight: 500;
     color: var(--text-muted);
+    border: none;
     border-bottom: 2px solid transparent;
+    background: none;
     transition: color 0.2s, border-color 0.2s;
     white-space: nowrap;
     user-select: none;
@@ -146,27 +155,101 @@
     position: relative;
   }
 
-  .tab:hover { color: var(--text-secondary); }
+  .tab-group-btn::after {
+    content: '\25BE';
+    font-size: 10px;
+    opacity: 0.5;
+  }
+
+  .tab-group-btn:hover { color: var(--text-secondary); }
+
+  .tab-group-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-group-btn.has-cross-up {
+    color: var(--green);
+    border-bottom-color: var(--green);
+    background: linear-gradient(180deg, transparent 60%, rgba(16, 185, 129, 0.06));
+  }
+
+  .tab-group-btn.has-cross-down {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    background: linear-gradient(180deg, transparent 60%, rgba(239, 68, 68, 0.06));
+  }
+
+  .tab-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 4px 0;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .tab-group.open .tab-dropdown {
+    display: block;
+  }
+
+  /* ── Tab items (inside dropdown + standalone) ── */
+  .tab {
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.15s, background 0.15s;
+    white-space: nowrap;
+    user-select: none;
+    letter-spacing: 0.01em;
+    position: relative;
+  }
+
+  .tab:hover { color: var(--text-secondary); background: var(--bg-hover); }
 
   .tab.active {
     color: var(--accent);
-    border-bottom-color: var(--accent);
+    background: var(--accent-glow);
   }
 
   .tab.cross-up { color: var(--text-muted); }
   .tab.cross-up:hover { color: var(--green); }
   .tab.cross-up.active {
     color: var(--green);
-    border-bottom-color: var(--green);
-    background: linear-gradient(180deg, transparent 60%, rgba(16, 185, 129, 0.06));
+    background: var(--green-dim);
   }
 
   .tab.cross-down { color: var(--text-muted); }
   .tab.cross-down:hover { color: var(--red); }
   .tab.cross-down.active {
     color: var(--red);
-    border-bottom-color: var(--red);
-    background: linear-gradient(180deg, transparent 60%, rgba(239, 68, 68, 0.06));
+    background: var(--red-dim);
+  }
+
+  /* Standalone tabs (no group) — sit directly in .tabs bar */
+  .tab.standalone {
+    padding: 10px 16px;
+    min-height: 42px;
+    border-bottom: 2px solid transparent;
+    background: none;
+  }
+
+  .tab.standalone:hover { background: none; color: var(--text-secondary); }
+
+  .tab.standalone.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: none;
   }
 
   .tab .count {
@@ -192,6 +275,34 @@
   }
 
   .tab.cross-down.active .count {
+    background: var(--red-dim);
+    color: var(--red);
+  }
+
+  /* Counts inside group button */
+  .tab-group-btn .count {
+    margin-left: 4px;
+    font-family: var(--font-data);
+    font-size: 10px;
+    font-weight: 500;
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0;
+  }
+
+  .tab-group-btn.active .count {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .tab-group-btn.has-cross-up .count {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+
+  .tab-group-btn.has-cross-down .count {
     background: var(--red-dim);
     color: var(--red);
   }
@@ -631,7 +742,10 @@
     .banner h1 { font-size: 15px; margin-right: 0; }
     .banner .meta { font-size: 10px; }
     .tabs { padding: 0 8px; }
-    .tab { padding: 8px 10px; font-size: 11px; min-height: 36px; }
+    .tab-group-btn { padding: 8px 10px; font-size: 11px; min-height: 36px; }
+    .tab-group-btn .count { font-size: 9px; margin-left: 3px; padding: 1px 5px; }
+    .tab { padding: 6px 10px; font-size: 11px; }
+    .tab.standalone { padding: 8px 10px; min-height: 36px; }
     .tab .count { font-size: 9px; margin-left: 4px; padding: 1px 5px; }
     .source-toggles { padding: 6px 8px; gap: 4px; }
     .source-group { display: flex; gap: 4px; flex-wrap: wrap; width: 100%; }
@@ -663,7 +777,10 @@
     .banner { padding: 8px 8px; }
     .banner h1 { font-size: 14px; }
     .tabs { padding: 0 4px; }
-    .tab { padding: 6px 7px; font-size: 10px; min-height: 32px; }
+    .tab-group-btn { padding: 6px 7px; font-size: 10px; min-height: 32px; }
+    .tab-group-btn .count { font-size: 8px; padding: 1px 4px; }
+    .tab { padding: 5px 7px; font-size: 10px; }
+    .tab.standalone { padding: 6px 7px; min-height: 32px; }
     .tab .count { font-size: 8px; padding: 1px 4px; }
     .source-toggles { padding: 4px 4px; gap: 3px; }
     .source-group { gap: 3px; }
@@ -790,6 +907,16 @@ const COL_LABELS = {
 
 const CROSS_UP_TABS = new Set(['crossovers', 'moCrossUp', 'qCrossUp']);
 const CROSS_DOWN_TABS = new Set(['crossdowns', 'moCrossDown', 'qCrossDown']);
+
+const TAB_GROUPS = [
+  { label: 'Daily',     tabs: ['dayBelow', 'dayAbove'] },
+  { label: 'Weekly',    tabs: ['crossovers', 'crossdowns', 'weekBelow', 'weekAbove'] },
+  { label: 'Monthly',   tabs: ['moCrossUp', 'moCrossDown', 'moBelow', 'moAbove'] },
+  { label: 'Quarterly', tabs: ['qCrossUp', 'qCrossDown', 'qBelow', 'qAbove', 'sinceQ', 'duringQ'] },
+];
+
+const GROUPED_TAB_IDS = new Set(TAB_GROUPS.flatMap(g => g.tabs));
+const STANDALONE_TABS = TAB_DEFS.filter(t => !GROUPED_TAB_IDS.has(t.id));
 
 const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain']);
 
@@ -1097,31 +1224,90 @@ function renderTbodyHTML(rows, cols, pctField, tabId) {
 
 /* ── Tabs ── */
 
+function getTabCount(t) {
+  if (t.special === 'miscStats') return '';
+  if (t.special) {
+    const rows = state.data[t.id] || [];
+    return `${rows.filter(r => matchesSources(r.symbol)).length}`;
+  }
+  const total = state.data[t.id] ? state.data[t.id].filter(r => matchesSources(r.symbol)).length : 0;
+  const filtered = state.data[t.id] ? applyFilters(state.data[t.id], t.cols).length : 0;
+  const isActive = t.id === state.activeTab;
+  const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
+    Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null));
+  return hasFilter ? `${filtered} / ${total}` : `${total}`;
+}
+
 function renderTabs() {
   const el = document.getElementById('tabs');
-  el.innerHTML = TAB_DEFS.map(t => {
-    let countText;
-    if (t.special === 'miscStats') {
-      countText = '';
-    } else if (t.special) {
-      const rows = state.data[t.id] || [];
-      const total = rows.filter(r => matchesSources(r.symbol)).length;
-      countText = `${total}`;
-    } else {
-      const total = state.data[t.id] ? state.data[t.id].filter(r => matchesSources(r.symbol)).length : 0;
-      const filtered = state.data[t.id] ? applyFilters(state.data[t.id], t.cols).length : 0;
-      const isActive = t.id === state.activeTab;
-      const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
-        Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null));
-      countText = hasFilter ? `${filtered} / ${total}` : `${total}`;
+  let html = '';
+
+  // Grouped tabs (dropdowns)
+  for (const group of TAB_GROUPS) {
+    const groupTabDefs = group.tabs.map(id => TAB_DEFS.find(t => t.id === id)).filter(Boolean);
+    const activeInGroup = groupTabDefs.find(t => t.id === state.activeTab);
+    const activeLabel = activeInGroup ? activeInGroup.label : group.label;
+
+    let btnCls = 'tab-group-btn';
+    if (activeInGroup) {
+      if (CROSS_UP_TABS.has(activeInGroup.id)) btnCls += ' has-cross-up';
+      else if (CROSS_DOWN_TABS.has(activeInGroup.id)) btnCls += ' has-cross-down';
+      else btnCls += ' active';
     }
-    const isActive = t.id === state.activeTab;
+
+    const countText = activeInGroup ? getTabCount(activeInGroup) : '';
     const countSpan = countText ? `<span class="count">${countText}</span>` : '';
+
+    html += `<div class="tab-group">`;
+    html += `<button class="${btnCls}">${activeLabel}${countSpan}</button>`;
+    html += `<div class="tab-dropdown">`;
+    for (const t of groupTabDefs) {
+      const isActive = t.id === state.activeTab;
+      const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
+      const tabCount = getTabCount(t);
+      const tabCountSpan = tabCount ? `<span class="count">${tabCount}</span>` : '';
+      html += `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${tabCountSpan}</div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  // Standalone tabs
+  for (const t of STANDALONE_TABS) {
+    const isActive = t.id === state.activeTab;
     const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
-    return `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">` +
-      `${t.label}${countSpan}</div>`;
-  }).join('');
-  el.querySelectorAll('.tab').forEach(tab =>
+    const countText = getTabCount(t);
+    const countSpan = countText ? `<span class="count">${countText}</span>` : '';
+    html += `<div class="tab standalone${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${countSpan}</div>`;
+  }
+
+  el.innerHTML = html;
+
+  // Dropdown toggle
+  el.querySelectorAll('.tab-group-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const group = btn.parentElement;
+      const wasOpen = group.classList.contains('open');
+      closeAllDropdowns();
+      if (!wasOpen) group.classList.add('open');
+    });
+  });
+
+  // Tab click inside dropdown
+  el.querySelectorAll('.tab-dropdown .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      state.activeTab = tab.dataset.tab;
+      state.sortCol = null;
+      state.sortAsc = true;
+      closeAllDropdowns();
+      writeHash();
+      renderTabs();
+      showTab(state.activeTab);
+    });
+  });
+
+  // Standalone tab click
+  el.querySelectorAll('.tab.standalone').forEach(tab => {
     tab.addEventListener('click', () => {
       state.activeTab = tab.dataset.tab;
       state.sortCol = null;
@@ -1129,9 +1315,15 @@ function renderTabs() {
       writeHash();
       renderTabs();
       showTab(state.activeTab);
-    })
-  );
+    });
+  });
 }
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.tab-group.open').forEach(g => g.classList.remove('open'));
+}
+
+document.addEventListener('click', () => closeAllDropdowns());
 
 /* ── Table building helpers ── */
 
