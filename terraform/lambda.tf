@@ -44,6 +44,7 @@ resource "aws_lambda_function" "worker" {
     variables = {
       BUCKET_NAME      = aws_s3_bucket.scanner.id
       DISTRIBUTION_ID  = aws_cloudfront_distribution.results.id
+      CODE_HASH        = data.archive_file.worker.output_base64sha256
     }
   }
 }
