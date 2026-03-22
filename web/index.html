@@ -122,7 +122,6 @@
     border-bottom: 1px solid var(--border);
     padding: 0 20px;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     align-items: stretch;
   }
@@ -1360,7 +1359,9 @@ function closeAllDropdowns() {
   document.querySelectorAll('.tab-group.open').forEach(g => g.classList.remove('open'));
 }
 
-document.addEventListener('click', () => closeAllDropdowns());
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.tab-group')) closeAllDropdowns();
+});
 
 /* ── Table building helpers ── */
 
