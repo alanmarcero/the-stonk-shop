@@ -353,7 +353,11 @@
     background: var(--bg-base);
     font-size: 12px;
     flex-wrap: wrap;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+
+  .toolbar::-webkit-scrollbar { display: none; }
 
   .row-count {
     color: var(--text-secondary);
@@ -730,68 +734,107 @@
 
   /* ── Responsive ── */
   @media (max-width: 640px) {
+    /* 1. Compact banner */
     .banner {
-      padding: 10px 12px;
-      gap: 6px;
+      padding: 8px 10px;
+      gap: 4px;
       flex-direction: column;
       align-items: flex-start;
     }
     .banner h1 { font-size: 15px; margin-right: 0; }
     .banner .meta { font-size: 10px; }
-    .tabs { padding: 0 8px; }
-    .tab-group-btn { padding: 8px 10px; font-size: 11px; min-height: 36px; }
+    .meta-sep { margin: 0 4px; }
+
+    /* 2. Tab bar: horizontal scroll with fade hints */
+    .tabs {
+      padding: 0 6px;
+      -webkit-mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 20px), transparent);
+      mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 20px), transparent);
+    }
+    .tab-group-btn { padding: 8px 10px; font-size: 11px; min-height: 40px; }
     .tab-group-btn .count { font-size: 9px; margin-left: 3px; padding: 1px 5px; }
     .tab { padding: 6px 10px; font-size: 11px; }
-    .tab.standalone { padding: 8px 10px; min-height: 36px; }
+    .tab.standalone { padding: 8px 10px; min-height: 40px; }
     .tab .count { font-size: 9px; margin-left: 4px; padding: 1px 5px; }
-    .source-toggles { padding: 6px 8px; gap: 4px; }
+
+    /* 3. Source toggles: fill width evenly */
+    .source-toggles { padding: 6px 6px; gap: 4px; }
     .source-group { display: flex; gap: 4px; flex-wrap: wrap; width: 100%; }
-    .source-btn { padding: 3px 8px; font-size: 10px; min-height: 26px; }
-    .toolbar { padding: 6px 10px 2px; gap: 4px; }
-    .reset-btn, .quick-btn { font-size: 10px; padding: 3px 8px; min-height: 26px; }
+    .source-btn { padding: 4px 8px; font-size: 10px; min-height: 32px; flex: 1 1 auto; text-align: center; }
+
+    /* 4. Sticky toolbar */
+    .toolbar {
+      padding: 6px 8px 4px;
+      gap: 4px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg-base);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    /* 5. Quick filters: horizontal scroll instead of wrapping */
+    .toolbar .quick-btn, .toolbar .reset-btn {
+      font-size: 10.5px;
+      padding: 4px 10px;
+      min-height: 30px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
     .quick-sep { display: none; }
-    .meta-sep { margin: 0 4px; }
-    .content { padding: 6px 4px 16px; }
+
+    /* 6. Content area: minimal padding */
+    .content { padding: 6px 2px 16px; }
+
+    /* 7. Table: compact rows + wider symbol column */
     table { font-size: 11px; }
-    th { padding: 6px 4px; font-size: 10px; }
-    td { padding: 4px 4px; font-size: 11px; }
-    td.symbol { max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+    th { padding: 6px 6px; font-size: 10px; }
+    td { padding: 4px 6px; font-size: 11px; }
+    td.symbol { max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
     .col-ema { display: none; }
+
+    /* 8. Filter row */
     .filter-row td { padding: 3px 2px; position: static; }
     .filter-row .num-filters { gap: 3px; }
     .filter-row .num-filters-stacked { flex-direction: column; gap: 3px; }
-    .num-filter-group { height: 28px; }
-    .spin-btn { width: 22px; font-size: 11px; }
-    .filter-row input.filter-num { width: 34px; font-size: 10px; padding: 2px 2px; }
-    .filter-row input.filter-symbol { font-size: 10px; min-height: 28px; }
-    .table-wrap { border-radius: var(--radius-sm); border-left: none; border-right: none; }
+    .num-filter-group { height: 30px; }
+    .spin-btn { width: 24px; font-size: 12px; }
+    .filter-row input.filter-num { width: 38px; font-size: 10px; padding: 2px 2px; }
+    .filter-row input.filter-symbol { font-size: 10px; min-height: 30px; }
+
+    /* 9. Table wrapper: edge-to-edge */
+    .table-wrap { border-radius: 0; border-left: none; border-right: none; }
+
+    /* 10. Stat cards: responsive grid */
     .stat-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .stat-card { padding: 14px 16px; }
     .stat-value { font-size: 20px; }
   }
 
   @media (max-width: 480px) {
-    .banner { padding: 8px 8px; }
+    .banner { padding: 6px 6px; }
     .banner h1 { font-size: 14px; }
     .tabs { padding: 0 4px; }
-    .tab-group-btn { padding: 6px 7px; font-size: 10px; min-height: 32px; }
+    .tab-group-btn { padding: 6px 8px; font-size: 10px; min-height: 36px; }
     .tab-group-btn .count { font-size: 8px; padding: 1px 4px; }
-    .tab { padding: 5px 7px; font-size: 10px; }
-    .tab.standalone { padding: 6px 7px; min-height: 32px; }
+    .tab { padding: 5px 8px; font-size: 10px; }
+    .tab.standalone { padding: 6px 8px; min-height: 36px; }
     .tab .count { font-size: 8px; padding: 1px 4px; }
     .source-toggles { padding: 4px 4px; gap: 3px; }
     .source-group { gap: 3px; }
-    .source-btn { padding: 2px 6px; font-size: 9px; min-height: 24px; }
-    .toolbar { padding: 4px 6px 2px; }
-    .content { padding: 4px 2px 12px; }
+    .source-btn { padding: 3px 6px; font-size: 9.5px; min-height: 30px; }
+    .toolbar { padding: 4px 6px 3px; }
+    .toolbar .quick-btn, .toolbar .reset-btn { font-size: 10px; padding: 3px 8px; min-height: 28px; }
+    .content { padding: 4px 0 12px; }
     table { font-size: 10px; }
-    th { padding: 4px 3px; font-size: 9px; }
-    td { padding: 3px 3px; }
+    th { padding: 5px 4px; font-size: 9px; }
+    td { padding: 3px 4px; }
+    td.symbol { max-width: 72px; }
     .filter-row td { padding: 2px 2px; position: static; }
-    .num-filter-group { height: 26px; }
-    .spin-btn { width: 22px; font-size: 10px; }
+    .num-filter-group { height: 28px; }
+    .spin-btn { width: 22px; font-size: 11px; }
     .filter-row input.filter-num { width: 36px; font-size: 9px; }
-    .filter-row input.filter-symbol { font-size: 9px; min-height: 26px; }
+    .filter-row input.filter-symbol { font-size: 9px; min-height: 28px; }
     .stat-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
     .stat-card { padding: 12px 12px; }
     .stat-value { font-size: 18px; }
