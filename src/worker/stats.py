@@ -77,6 +77,7 @@ def compute_stats(
     vix_spikes: Optional[list[dict]] = None,
     forward_pe: Optional[float] = None,
     forward_pe_history: Optional[dict] = None,
+    weekly_closes: Optional[list[float]] = None,
 ) -> Optional[dict]:
     """Compute all stats for a symbol. Returns None if insufficient data."""
     if len(closes) < 2:
@@ -121,6 +122,18 @@ def compute_stats(
         )
         if vix_returns:
             stats["vixReturns"] = vix_returns
+
+    # 200-day SMA
+    if len(closes) >= 200:
+        sma200d = round(sum(closes[-200:]) / 200, 2)
+        stats["sma200d"] = sma200d
+        stats["pctSma200d"] = round((closes[-1] - sma200d) / sma200d * 100, 2)
+
+    # 200-week SMA
+    if weekly_closes is not None and len(weekly_closes) >= 200:
+        sma200w = round(sum(weekly_closes[-200:]) / 200, 2)
+        stats["sma200w"] = sma200w
+        stats["pctSma200w"] = round((closes[-1] - sma200w) / sma200w * 100, 2)
 
     # Forward P/E
     if forward_pe is not None:

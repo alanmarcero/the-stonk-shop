@@ -211,11 +211,13 @@ def _process_batch(
 
         if stats_result is not None:
             forward_pe, pe_history = yahoo.fetch_forward_pe(symbol)
+            q_closes = quarterly_result[0] if quarterly_result is not None else None
             computed = stats.compute_stats(
                 stats_result[0], stats_result[1],
                 vix_spikes=vix_spikes,
                 forward_pe=forward_pe,
                 forward_pe_history=pe_history,
+                weekly_closes=q_closes,
             )
             if computed is not None:
                 computed["symbol"] = symbol
@@ -485,6 +487,17 @@ def _compute_misc_stats(
     if total_symbols > 0:
         misc["pctAbove5wkEMA"] = round(week_above_count / total_symbols * 100, 1)
         misc["pctBelow5wkEMA"] = round((total_symbols - week_above_count) / total_symbols * 100, 1)
+
+    # SMA breadth
+    above_200d = sum(1 for s in all_stats if s.get("pctSma200d") is not None and s["pctSma200d"] >= 0)
+    has_200d = sum(1 for s in all_stats if s.get("pctSma200d") is not None)
+    if has_200d > 0:
+        misc["pctAbove200dSMA"] = round(above_200d / has_200d * 100, 1)
+
+    above_200w = sum(1 for s in all_stats if s.get("pctSma200w") is not None and s["pctSma200w"] >= 0)
+    has_200w = sum(1 for s in all_stats if s.get("pctSma200w") is not None)
+    if has_200w > 0:
+        misc["pctAbove200wSMA"] = round(above_200w / has_200w * 100, 1)
 
     # SPX milestone returns (from VOO)
     voo = next((s for s in all_stats if s.get("symbol") == "VOO"), None)

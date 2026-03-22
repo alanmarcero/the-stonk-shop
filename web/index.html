@@ -895,7 +895,7 @@ const COL_LABELS = {
   quartersBelow: 'Quarters Below', quartersAbove: 'Quarters Above',
   count: 'Count',
   ytdPct: 'YTD', highPct: 'vs High', high3yr: '3yr High', lowPct: 'vs Low', low52wk: '52wk Low',
-  rsi: 'RSI', forwardPE: 'Fwd P/E',
+  rsi: 'RSI', forwardPE: 'Fwd P/E', pctSma200d: '% 200D', pctSma200w: '% 200W',
   breakoutPct: 'Breakout %', breakdownPct: 'Breakdown %',
   breakoutPrice: 'Breakout', breakdownPrice: 'Breakdown',
   breakoutDate: 'Date', breakdownDate: 'Date',
@@ -916,7 +916,7 @@ const TAB_GROUPS = [
 const GROUPED_TAB_IDS = new Set(TAB_GROUPS.flatMap(g => g.tabs));
 const STANDALONE_TABS = TAB_DEFS.filter(t => !GROUPED_TAB_IDS.has(t.id));
 
-const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain']);
+const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','pctSma200d','pctSma200w','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain']);
 
 const state = {
   activeSourceMode: 'all',
@@ -1218,6 +1218,10 @@ function renderRowHTML(row, cols, pctField, tabId) {
       const cls = val > 70 ? 'pct-negative' : val < 30 ? 'pct-positive' : '';
       return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
     }
+    if (col === 'pctSma200d' || col === 'pctSma200w') {
+      const cls = val != null ? (val >= 0 ? 'pct-positive' : 'pct-negative') : '';
+      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
+    }
     if (col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain') {
       const cls = val != null ? (val >= 0 ? 'pct-positive' : 'pct-negative') : '';
       return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
@@ -1510,7 +1514,7 @@ function showTab(tabId) {
 }
 
 const SPECIAL_TAB_COLS = {
-  performance: ['symbol','close','ytdPct','highPct','lowPct','rsi','forwardPE'],
+  performance: ['symbol','close','ytdPct','highPct','lowPct','rsi','forwardPE','pctSma200d','pctSma200w'],
   priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct','rsi'],
 };
 
@@ -1536,7 +1540,7 @@ function updateRows(tabId) {
 function fmtNum(col, v) {
   if (v == null) return '\u2014';
   if (col === 'close' || col === 'ema' || col === 'breakoutPrice' || col === 'breakdownPrice' || col === 'spikeClose' || col === 'high3yr' || col === 'low52wk') return v.toFixed(2);
-  if (col === 'pct' || col === 'ytdPct' || col === 'highPct' || col === 'lowPct' || col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain') return (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+  if (col === 'pct' || col === 'ytdPct' || col === 'highPct' || col === 'lowPct' || col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain' || col === 'pctSma200d' || col === 'pctSma200w') return (v > 0 ? '+' : '') + v.toFixed(2) + '%';
   if (col === 'rsi') return v.toFixed(1);
   if (col === 'forwardPE') return v.toFixed(1);
   return v.toLocaleString();
@@ -1716,6 +1720,8 @@ function showMiscStats() {
     { label: 'Median Fwd P/E', value: misc.medianForwardPE != null ? misc.medianForwardPE.toFixed(1) : '\u2014' },
     { label: 'Above 5wk EMA', value: misc.pctAbove5wkEMA != null ? misc.pctAbove5wkEMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove5wkEMA != null ? 'var(--green)' : null },
     { label: 'Below 5wk EMA', value: misc.pctBelow5wkEMA != null ? misc.pctBelow5wkEMA.toFixed(1) + '%' : '\u2014', color: misc.pctBelow5wkEMA != null ? 'var(--red)' : null },
+    { label: 'Above 200D SMA', value: misc.pctAbove200dSMA != null ? misc.pctAbove200dSMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove200dSMA != null ? 'var(--green)' : null },
+    { label: 'Above 200W SMA', value: misc.pctAbove200wSMA != null ? misc.pctAbove200wSMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove200wSMA != null ? 'var(--green)' : null },
     { label: 'SPX Since Election', value: misc.spxSinceElection != null ? (misc.spxSinceElection > 0 ? '+' : '') + misc.spxSinceElection.toFixed(2) + '%' : '\u2014', color: misc.spxSinceElection != null ? (misc.spxSinceElection >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'SPX Since Inauguration', value: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration > 0 ? '+' : '') + misc.spxSinceInauguration.toFixed(2) + '%' : '\u2014', color: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration >= 0 ? 'var(--green)' : 'var(--red)') : null },
   ];
@@ -1745,6 +1751,7 @@ function buildSpecialTabData() {
     ytdPct: s.ytdPct ?? null, highPct: s.highPct ?? null,
     lowPct: s.lowPct ?? null,
     rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
+    pctSma200d: s.pctSma200d ?? null, pctSma200w: s.pctSma200w ?? null,
   }));
 
   // Price Breaks — single combined table
