@@ -211,11 +211,13 @@ def _process_batch(
 
         if stats_result is not None:
             forward_pe, pe_history = yahoo.fetch_forward_pe(symbol)
+            q_closes = quarterly_result[0] if quarterly_result is not None else None
             computed = stats.compute_stats(
                 stats_result[0], stats_result[1],
                 vix_spikes=vix_spikes,
                 forward_pe=forward_pe,
                 forward_pe_history=pe_history,
+                weekly_closes=q_closes,
             )
             if computed is not None:
                 computed["symbol"] = symbol

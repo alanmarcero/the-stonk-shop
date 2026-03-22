@@ -240,3 +240,63 @@ class TestComputeStats:
 
         assert result is not None
         assert "forwardPEHistory" not in result
+
+
+class TestSma200:
+
+    def test_sma200d_with_sufficient_data(self):
+        closes = [float(i) for i in range(1, 251)]
+        timestamps = [_ts(2025, 1, 1) + i * 86400 for i in range(250)]
+
+        result = compute_stats(closes, timestamps)
+
+        assert result is not None
+        expected_sma = round(sum(closes[-200:]) / 200, 2)
+        assert result["sma200d"] == expected_sma
+        assert "pctSma200d" in result
+
+    def test_sma200d_insufficient_data(self):
+        closes = [100.0 + i for i in range(50)]
+        timestamps = [_ts(2025, 12, 1) + i * 86400 for i in range(50)]
+
+        result = compute_stats(closes, timestamps)
+
+        assert result is not None
+        assert "sma200d" not in result
+        assert "pctSma200d" not in result
+
+    def test_sma200w_with_sufficient_data(self):
+        closes = [100.0, 110.0]
+        timestamps = [_ts(2025, 12, 31), _ts(2026, 1, 2)]
+        weekly_closes = [float(i) for i in range(1, 210)]
+
+        result = compute_stats(closes, timestamps, weekly_closes=weekly_closes)
+
+        assert result is not None
+        expected_sma = round(sum(weekly_closes[-200:]) / 200, 2)
+        assert result["sma200w"] == expected_sma
+        assert "pctSma200w" in result
+        # pct should be relative to current daily close
+        expected_pct = round((closes[-1] - expected_sma) / expected_sma * 100, 2)
+        assert result["pctSma200w"] == expected_pct
+
+    def test_sma200w_insufficient_data(self):
+        closes = [100.0, 110.0]
+        timestamps = [_ts(2025, 12, 31), _ts(2026, 1, 2)]
+        weekly_closes = [float(i) for i in range(1, 100)]
+
+        result = compute_stats(closes, timestamps, weekly_closes=weekly_closes)
+
+        assert result is not None
+        assert "sma200w" not in result
+        assert "pctSma200w" not in result
+
+    def test_sma200w_none_weekly_closes(self):
+        closes = [100.0, 110.0]
+        timestamps = [_ts(2025, 12, 31), _ts(2026, 1, 2)]
+
+        result = compute_stats(closes, timestamps, weekly_closes=None)
+
+        assert result is not None
+        assert "sma200w" not in result
+        assert "pctSma200w" not in result
