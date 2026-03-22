@@ -1432,11 +1432,13 @@ function renderFilterRow(def) {
     const f = state.filters[c] || {};
     const minVal = f.min != null ? f.min : '';
     const stackClass = c === 'close' ? ' num-filters-stacked' : '';
+    const defaultBound = c === 'rsi' ? 'max' : 'min';
+    const defaultVal = defaultBound === 'max' ? (f.max != null ? f.max : '') : minVal;
     let cell = `<td class="num${emaClass}"><div class="num-filters${stackClass}">` +
       `<div class="num-filter-group">` +
-        `<button class="spin-btn" data-col="${c}" data-bound="min" data-dir="-1">&#x2212;</button>` +
-        `<input type="number" class="filter-num" data-col="${c}" data-bound="min" placeholder="min" value="${minVal}">` +
-        `<button class="spin-btn" data-col="${c}" data-bound="min" data-dir="1">+</button>` +
+        `<button class="spin-btn" data-col="${c}" data-bound="${defaultBound}" data-dir="-1">&#x2212;</button>` +
+        `<input type="number" class="filter-num" data-col="${c}" data-bound="${defaultBound}" placeholder="${defaultBound}" value="${defaultVal}">` +
+        `<button class="spin-btn" data-col="${c}" data-bound="${defaultBound}" data-dir="1">+</button>` +
       `</div>`;
     if (c === 'close') {
       const maxVal = f.max != null ? f.max : '';
