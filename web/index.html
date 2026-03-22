@@ -879,7 +879,7 @@ const TAB_DEFS = [
   { id: 'qCrossDown', label: 'Q Cross Down',   file: '/results/latest-quarterly.json',              key: 'quarterCrossdowns', cols: ['symbol','close','quartersAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctBelow' },
   { id: 'qBelow',     label: 'Q Below',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterBelow',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
   { id: 'qAbove',     label: 'Q Above',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterAbove',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'performance', label: 'Performance',     special: 'performance' },
+  { id: 'performance', label: 'YTD Stats',        special: 'performance' },
   { id: 'priceBreaks', label: 'Price Breaks',   special: 'priceBreaks' },
   { id: 'sinceQ',      label: 'Since Quarter',  special: 'sinceQuarter' },
   { id: 'duringQ',     label: 'During Quarter', special: 'duringQuarter' },
@@ -910,6 +910,7 @@ const TAB_GROUPS = [
   { label: 'Weekly',    tabs: ['crossovers', 'crossdowns', 'weekBelow', 'weekAbove'] },
   { label: 'Monthly',   tabs: ['moCrossUp', 'moCrossDown', 'moBelow', 'moAbove'] },
   { label: 'Quarterly', tabs: ['qCrossUp', 'qCrossDown', 'qBelow', 'qAbove', 'sinceQ', 'duringQ'] },
+  { label: 'Performance', tabs: ['priceBreaks', 'fwdPE', 'vixSpikes'] },
 ];
 
 const GROUPED_TAB_IDS = new Set(TAB_GROUPS.flatMap(g => g.tabs));
