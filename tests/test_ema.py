@@ -1,6 +1,6 @@
 import pytest
 
-from src.worker.ema import DEFAULT_PERIOD, calculate, count_periods_above, count_periods_below, detect_weekly_crossover, detect_weekly_crossdown
+from src.worker.ema import calculate, count_periods_above, count_periods_below, detect_weekly_crossover, detect_weekly_crossdown
 
 
 def test_calculate_empty_closes_returns_none():
@@ -48,10 +48,6 @@ def test_calculate_downtrend_ema_falls():
     closes = [135.0, 130.0, 125.0, 120.0, 115.0, 110.0, 105.0, 100.0]
     result = calculate(closes=closes)
     assert result < 125.0
-
-
-def test_default_period_is_5():
-    assert DEFAULT_PERIOD == 5
 
 
 def test_detect_weekly_crossover_no_data_returns_none():

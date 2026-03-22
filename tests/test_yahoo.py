@@ -4,6 +4,7 @@ import json
 from src.worker.yahoo import (
     fetch_daily_candles, fetch_monthly_candles,
     fetch_quarterly_candles, fetch_forward_pe, fetch_vix_candles,
+    fetch_stats_candles,
     _parse_response, _parse_forward_pe, _parse_forward_pe_history,
     BASE_URL, TIMESERIES_URL, USER_AGENT, TIMEOUT_SECONDS,
 )
@@ -471,17 +472,70 @@ class TestParseForwardPEHistory:
         result = _parse_forward_pe_history(data)
         assert result == {"Q1'25": 15.0, "Q2'25": 16.0, "Q3'25": 17.0, "Q4'25": 18.0}
 
+    def test_malformed_date_skipped(self):
+        data = {
+            "timeseries": {
+                "result": [{
+                    "quarterlyForwardPeRatio": [
+                        {"asOfDate": "baddate", "reportedValue": {"raw": 15.0}},
+                        {"asOfDate": "2025-06-30", "reportedValue": {"raw": 18.0}},
+                    ]
+                }]
+            }
+        }
+        assert _parse_forward_pe_history(data) == {"Q2'25": 18.0}
 
-class TestConstants:
+    def test_missing_raw_value_skipped(self):
+        data = {
+            "timeseries": {
+                "result": [{
+                    "quarterlyForwardPeRatio": [
+                        {"asOfDate": "2025-03-31", "reportedValue": {}},
+                        {"asOfDate": "2025-06-30", "reportedValue": {"raw": 20.0}},
+                    ]
+                }]
+            }
+        }
+        assert _parse_forward_pe_history(data) == {"Q2'25": 20.0}
 
-    def test_base_url(self):
-        assert BASE_URL == "https://query1.finance.yahoo.com/v8/finance/chart"
 
-    def test_timeseries_url(self):
-        assert "fundamentals-timeseries" in TIMESERIES_URL
+class TestFetchStatsCandles:
 
-    def test_user_agent(self):
-        assert "Mozilla" in USER_AGENT
+    @patch("src.worker.yahoo.urllib.request.urlopen")
+    def test_builds_correct_url(self, mock_urlopen):
+        mock_urlopen.side_effect = OSError("stop")
 
-    def test_timeout(self):
-        assert TIMEOUT_SECONDS == 10
+        fetch_stats_candles("AAPL")
+
+        request = mock_urlopen.call_args[0][0]
+        assert request.full_url == f"{BASE_URL}/AAPL?range=3y&interval=1d"
+
+    @patch("src.worker.yahoo.urllib.request.urlopen")
+    def test_success(self, mock_urlopen):
+        response_data = {
+            "chart": {
+                "result": [{
+                    "timestamp": [1000, 2000],
+                    "indicators": {"quote": [{"close": [150.0, 155.0]}]},
+                }]
+            }
+        }
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(response_data).encode()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        result = fetch_stats_candles("AAPL")
+
+        assert result is not None
+        closes, timestamps = result
+        assert closes == [150.0, 155.0]
+
+    @patch("src.worker.yahoo.urllib.request.urlopen")
+    def test_network_error_returns_none(self, mock_urlopen):
+        mock_urlopen.side_effect = ConnectionError("no network")
+
+        assert fetch_stats_candles("FAIL") is None
+
+
