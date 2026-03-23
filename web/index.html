@@ -1662,7 +1662,7 @@ function formatWeekLabel(dateStr) {
 
 function renderWeekSelector() {
   const el = document.getElementById('week-selector');
-  if (state.manifest.length < 2) {
+  if (state.manifest.length < 1) {
     el.style.display = 'none';
     return;
   }

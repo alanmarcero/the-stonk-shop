@@ -53,6 +53,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         total_batches: int = message["totalBatches"]
         symbols: list[str] = message["symbols"]
         vix_spikes: list[dict] = message.get("vixSpikes", [])
+        snapshot: bool = message.get("snapshot", False)
 
         result = _process_batch(symbols, vix_spikes)
 
@@ -62,7 +63,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
             _write_errors(bucket, run_id, batch_index, result.errors)
 
         if _all_batches_complete(bucket, run_id, total_batches):
-            _aggregate_results(bucket, run_id, total_batches)
+            _aggregate_results(bucket, run_id, total_batches, snapshot=snapshot)
             _invalidate_cache()
 
     return {"statusCode": 200}
@@ -389,10 +390,10 @@ def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
         return False
 
 
-def _aggregate_results(bucket: str, run_id: str, total_batches: int) -> None:
+def _aggregate_results(bucket: str, run_id: str, total_batches: int, *, snapshot: bool = False) -> None:
     aggregated, total_symbols, total_errors = _read_batches(bucket, run_id, total_batches)
     _sort_aggregated(aggregated)
-    _write_results(bucket, aggregated, total_symbols, total_errors)
+    _write_results(bucket, aggregated, total_symbols, total_errors, snapshot=snapshot)
 
 
 def _read_batches(
@@ -426,6 +427,7 @@ def _sort_aggregated(aggregated: dict[str, list[dict]]) -> None:
 
 def _write_results(
     bucket: str, aggregated: dict[str, list[dict]], total_symbols: int, total_errors: int,
+    *, snapshot: bool = False,
 ) -> None:
     now = datetime.now(timezone.utc)
     scan_date = now.strftime("%Y-%m-%d")
@@ -448,16 +450,16 @@ def _write_results(
     aggregated["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
     _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": aggregated["errorDetails"]})
 
-    for suffix, _ in _RESULT_FILES:
-        _put_json(bucket, f"results/{scan_date}{suffix}.json", results_by_suffix[suffix])
-
     aggregated["stats"].sort(key=lambda x: x.get("symbol", ""))
     misc = _compute_misc_stats(aggregated["stats"], len(aggregated["weekAbove"]), total_symbols)
     stats_result = {**base, "stats": aggregated["stats"], "misc": misc}
     _put_json(bucket, "results/latest-stats.json", stats_result)
-    _put_json(bucket, f"results/{scan_date}-stats.json", stats_result)
 
-    _update_manifest(bucket, scan_date)
+    if snapshot:
+        for suffix, _ in _RESULT_FILES:
+            _put_json(bucket, f"results/{scan_date}{suffix}.json", results_by_suffix[suffix])
+        _put_json(bucket, f"results/{scan_date}-stats.json", stats_result)
+        _update_manifest(bucket, scan_date)
 
 
 def _compute_misc_stats(
