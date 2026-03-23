@@ -176,12 +176,12 @@ def _process_batch(
         if i > 0:
             time.sleep(RATE_LIMIT_DELAY)
 
-        daily_result = yahoo.fetch_daily_candles(symbol)
-        monthly_result = yahoo.fetch_monthly_candles(symbol)
-        quarterly_result = yahoo.fetch_quarterly_candles(symbol)
-        stats_result = yahoo.fetch_stats_candles(symbol)
+        # Two API calls instead of four: 5y weekly covers weekly/monthly/quarterly
+        # EMA analysis, 3y daily covers daily EMA and all stats computations.
+        weekly_result = yahoo.fetch_quarterly_candles(symbol)
+        daily_result = yahoo.fetch_stats_candles(symbol)
 
-        if daily_result is None and monthly_result is None and quarterly_result is None:
+        if weekly_result is None and daily_result is None:
             print(f"[worker] {symbol}: fetch failed")
             batch.errors.append({"symbol": symbol, "error": "Failed to fetch candles"})
             continue
@@ -193,15 +193,15 @@ def _process_batch(
             batch.day_below.append(daily_below)
 
         weekly = _process_timeframe(
-            symbol, monthly_result, "weeksBelow", "weeksAbove",
+            symbol, weekly_result, "weeksBelow", "weeksAbove",
             min_below=MIN_WEEKS_THRESHOLD,
         )
         monthly = _process_timeframe(
-            symbol, monthly_result, "monthsBelow", "monthsAbove",
+            symbol, weekly_result, "monthsBelow", "monthsAbove",
             aggregate_fn=_aggregate_to_monthly,
         )
         quarterly = _process_timeframe(
-            symbol, quarterly_result, "quartersBelow", "quartersAbove",
+            symbol, weekly_result, "quartersBelow", "quartersAbove",
             aggregate_fn=_aggregate_to_quarterly,
         )
 
@@ -209,11 +209,11 @@ def _process_batch(
         _append_timeframe_results(batch, monthly, "month_crossovers", "month_crossdowns", "month_below", "month_above")
         _append_timeframe_results(batch, quarterly, "quarter_crossovers", "quarter_crossdowns", "quarter_below", "quarter_above")
 
-        if stats_result is not None:
+        if daily_result is not None:
             forward_pe, pe_history = yahoo.fetch_forward_pe(symbol)
-            q_closes = quarterly_result[0] if quarterly_result is not None else None
+            q_closes = weekly_result[0] if weekly_result is not None else None
             computed = stats.compute_stats(
-                stats_result[0], stats_result[1],
+                daily_result[0], daily_result[1],
                 vix_spikes=vix_spikes,
                 forward_pe=forward_pe,
                 forward_pe_history=pe_history,
@@ -222,7 +222,7 @@ def _process_batch(
             if computed is not None:
                 computed["symbol"] = symbol
                 if symbol == "VOO":
-                    closes, timestamps = stats_result
+                    closes, timestamps = daily_result
                     election = stats.compute_return_since(closes, timestamps, 2024, 11, 5)
                     if election is not None:
                         computed["spxSinceElection"] = election
