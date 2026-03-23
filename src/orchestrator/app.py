@@ -26,6 +26,8 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
     vix_spikes = _fetch_vix_spikes()
 
+    snapshot = event.get("snapshot", False)
+
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     batches = [symbols[i : i + BATCH_SIZE] for i in range(0, len(symbols), BATCH_SIZE)]
     total_batches = len(batches)
@@ -39,6 +41,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
                 "totalBatches": total_batches,
                 "symbols": batch,
                 "vixSpikes": vix_spikes,
+                "snapshot": snapshot,
             }),
         )
 

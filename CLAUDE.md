@@ -10,7 +10,7 @@ python3 -m pytest tests/ -v
 
 ## Architecture
 
-EventBridge Scheduler (Wed–Fri hourly 10am–3pm, Fri 3:30pm, Wed–Fri 4:05pm ET) → Orchestrator Lambda → SQS → Worker Lambda (max concurrency 5) → S3 → CloudFront.
+EventBridge Scheduler (every hour, every day + Monday 3am ET weekly snapshot) → Orchestrator Lambda → SQS → Worker Lambda (max concurrency 5) → S3 → CloudFront. Weekly snapshots (max 6) are saved on Monday 3am runs and linked in the dashboard.
 
 **Cost goal: under $1/month.** All AWS infrastructure decisions must prioritize minimal cost. Prefer free-tier-eligible resources, avoid provisioned capacity, and keep Lambda memory/timeout as low as practical.
 

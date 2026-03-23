@@ -73,6 +73,3 @@ jobs:
           aws s3 cp ../web/index.html "s3://${BUCKET}/app/index.html" --content-type "text/html" --cache-control "no-cache"
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 
-      - name: Trigger scanner run
-        run: |
-          aws lambda invoke --function-name ema-scanner-orchestrator --invocation-type Event /dev/null

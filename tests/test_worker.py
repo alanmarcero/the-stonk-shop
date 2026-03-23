@@ -745,7 +745,7 @@ class TestLambdaHandler:
 
         lambda_handler(event, None)
 
-        self.mock_agg.assert_called_once_with("test-bucket", "2026-02-22", 3)
+        self.mock_agg.assert_called_once_with("test-bucket", "2026-02-22", 3, snapshot=False)
 
     def test_incomplete_batches_skips_aggregation(self):
         self.mock_process.return_value = BatchResult()
@@ -897,7 +897,7 @@ class TestAggregateResults:
 
         _aggregate_results("test-bucket", "2026-02-22", 2)
 
-        assert self.mock_put.call_count == 19
+        assert self.mock_put.call_count == 10
         latest_data = self.mock_put.call_args_list[0][0][2]
         assert latest_data["symbolsScanned"] == 100
         assert latest_data["errors"] == 1
@@ -1246,7 +1246,7 @@ class TestAggregateResults:
     def test_aggregate_writes_all_dated_files(self):
         self.mock_read.return_value = EMPTY_BATCH
 
-        _aggregate_results("mybucket", "2026-03-14", 1)
+        _aggregate_results("mybucket", "2026-03-14", 1, snapshot=True)
 
         put_keys = {call[0][1] for call in self.mock_put.call_args_list}
         # Dated files use datetime.now(), so extract the actual date used
@@ -1266,7 +1266,7 @@ class TestAggregateResults:
     def test_aggregate_calls_update_manifest(self):
         self.mock_read.return_value = EMPTY_BATCH
 
-        _aggregate_results("mybucket", "2026-03-14", 1)
+        _aggregate_results("mybucket", "2026-03-14", 1, snapshot=True)
 
         self.mock_manifest.assert_called_once()
         args = self.mock_manifest.call_args[0]
