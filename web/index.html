@@ -847,6 +847,7 @@
 <div class="banner">
   <h1>EMA Scanner</h1>
   <div id="meta"></div>
+  <button id="run-scan-btn" class="quick-btn" style="margin-left: auto;">Run Scan</button>
 </div>
 
 <div class="tabs" id="tabs"></div>
@@ -1897,6 +1898,29 @@ function _buildVixSpikeData(stats) {
 
 async function fetchAll() {
   readHash();
+
+  const btn = document.getElementById('run-scan-btn');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = 'Starting...';
+    try {
+      const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'POST' });
+      if (res.status === 429) {
+        btn.textContent = 'Scan in progress';
+      } else if (res.ok) {
+        btn.textContent = 'Started!';
+      } else {
+        btn.textContent = 'Failed';
+      }
+    } catch (e) {
+      btn.textContent = 'Error';
+    }
+    setTimeout(() => {
+      btn.textContent = oldText;
+      btn.disabled = false;
+    }, 3000);
+  });
 
   const cb = `_=${Date.now()}`;
   const urls = [...new Set(TAB_DEFS.filter(t => t.file).map(t => t.file))];

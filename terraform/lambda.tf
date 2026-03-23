@@ -33,7 +33,7 @@ resource "aws_lambda_function" "worker" {
   role                           = aws_iam_role.worker.arn
   runtime                        = "python3.12"
   handler                        = "app.lambda_handler"
-  memory_size                    = 128
+  memory_size                    = 256
   timeout                        = 300
 
 
@@ -47,6 +47,24 @@ resource "aws_lambda_function" "worker" {
       CODE_HASH        = data.archive_file.worker.output_base64sha256
     }
   }
+}
+
+resource "aws_lambda_function_url" "orchestrator_url" {
+  function_name      = aws_lambda_function.orchestrator.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_credentials = true
+    allow_origins     = ["*"]
+    allow_methods     = ["POST", "GET"]
+    allow_headers     = ["*"]
+    expose_headers    = ["*"]
+    max_age           = 86400
+  }
+}
+
+output "orchestrator_url" {
+  value = aws_lambda_function_url.orchestrator_url.function_url
 }
 
 resource "aws_lambda_event_source_mapping" "worker_sqs" {

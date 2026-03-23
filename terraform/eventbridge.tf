@@ -2,7 +2,7 @@ resource "aws_scheduler_schedule" "hourly" {
   name       = "ema-scanner-hourly"
   group_name = "default"
 
-  schedule_expression          = "cron(0 * ? * * *)"
+  schedule_expression          = "cron(0 10-16 ? * MON-FRI *)"
   schedule_expression_timezone = "America/New_York"
 
   flexible_time_window {
@@ -19,7 +19,7 @@ resource "aws_scheduler_schedule" "weekly_snapshot" {
   name       = "ema-scanner-weekly-snapshot"
   group_name = "default"
 
-  schedule_expression          = "cron(0 3 ? * MON *)"
+  schedule_expression          = "cron(0 3 ? * MON *)" 
   schedule_expression_timezone = "America/New_York"
 
   flexible_time_window {

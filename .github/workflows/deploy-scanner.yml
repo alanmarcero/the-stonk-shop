@@ -69,6 +69,8 @@ jobs:
           cd terraform
           BUCKET=$(terraform output -raw bucket_name)
           DIST_ID=$(terraform output -raw cloudfront_distribution_id)
+          ORCHESTRATOR_URL=$(terraform output -raw orchestrator_url || echo "")
+          sed -i "s|__ORCHESTRATOR_URL__|${ORCHESTRATOR_URL}|g" ../web/index.html
           aws s3 cp ../symbols/us-equities.txt "s3://${BUCKET}/symbols/us-equities.txt" --content-type "text/plain"
           aws s3 cp ../web/index.html "s3://${BUCKET}/app/index.html" --content-type "text/html" --cache-control "no-cache"
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"

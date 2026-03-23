@@ -6,7 +6,7 @@ from typing import Any
 
 import boto3
 
-BATCH_SIZE = 50
+BATCH_SIZE = 25
 VIX_URL = "https://query1.finance.yahoo.com/v8/finance/chart/^VIX?range=3y&interval=1d"
 USER_AGENT = "Mozilla/5.0"
 VIX_TIMEOUT = 15
@@ -20,6 +20,32 @@ sqs = boto3.client("sqs")
 def lambda_handler(event: dict, context: Any) -> dict:
     bucket = os.environ["BUCKET_NAME"]
     queue_url = os.environ["QUEUE_URL"]
+
+    is_http = "requestContext" in event and "http" in event["requestContext"]
+    if is_http:
+        qs = event.get("queryStringParameters", {})
+        if qs.get("dev_key") != "stonks":
+            return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
+
+    attrs = sqs.get_queue_attributes(
+        QueueUrl=queue_url,
+        AttributeNames=[
+            "ApproximateNumberOfMessages",
+            "ApproximateNumberOfMessagesNotVisible",
+            "ApproximateNumberOfMessagesDelayed",
+        ],
+    )
+    attr_dict = attrs.get("Attributes", {})
+    in_flight = sum(int(attr_dict.get(k, 0)) for k in [
+        "ApproximateNumberOfMessages",
+        "ApproximateNumberOfMessagesNotVisible",
+        "ApproximateNumberOfMessagesDelayed",
+    ])
+    if in_flight > 0:
+        msg = f"Scan already in progress (queue size: {in_flight})"
+        print(f"[orchestrator] {msg}")
+        return {"statusCode": 429, "body": json.dumps({"error": msg})}
+
     resp = s3.get_object(Bucket=bucket, Key="symbols/us-equities.txt")
     lines = resp["Body"].read().decode("utf-8").splitlines()
     symbols = [line.strip() for line in lines if line.strip()]
@@ -47,12 +73,13 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
     return {
         "statusCode": 200,
-        "body": {
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({
             "runId": run_id,
             "totalSymbols": len(symbols),
             "totalBatches": total_batches,
             "vixSpikes": len(vix_spikes),
-        },
+        }),
     }
 
 

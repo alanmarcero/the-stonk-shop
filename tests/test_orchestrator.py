@@ -2,7 +2,7 @@ import json
 from io import BytesIO
 from unittest.mock import patch, MagicMock
 
-from src.orchestrator.app import lambda_handler, _detect_vix_spikes, _fetch_vix_spikes
+from src.orchestrator.app import lambda_handler, _detect_vix_spikes, _fetch_vix_spikes, BATCH_SIZE
 
 
 class TestLambdaHandler:
@@ -17,6 +17,13 @@ class TestLambdaHandler:
         self._env_patcher.start()
         self.mock_s3 = self._s3_patcher.start()
         self.mock_sqs = self._sqs_patcher.start()
+        self.mock_sqs.get_queue_attributes.return_value = {
+            "Attributes": {
+                "ApproximateNumberOfMessages": "0",
+                "ApproximateNumberOfMessagesNotVisible": "0",
+                "ApproximateNumberOfMessagesDelayed": "0",
+            }
+        }
         self.mock_vix = self._vix_patcher.start()
         self.mock_vix.return_value = []
 
@@ -45,7 +52,7 @@ class TestLambdaHandler:
 
         lambda_handler({}, None)
 
-        assert self.mock_sqs.send_message.call_count == 3
+        assert self.mock_sqs.send_message.call_count == 5
 
     def test_batch_message_structure(self):
         symbols = [f"SYM{i}" for i in range(60)]
@@ -56,15 +63,15 @@ class TestLambdaHandler:
         first_call = self.mock_sqs.send_message.call_args_list[0]
         body = json.loads(first_call[1]["MessageBody"])
         assert body["batchIndex"] == 0
-        assert body["totalBatches"] == 2
-        assert len(body["symbols"]) == 50
+        assert body["totalBatches"] == 3
+        assert len(body["symbols"]) == 25
         assert "runId" in body
 
         second_call = self.mock_sqs.send_message.call_args_list[1]
         body2 = json.loads(second_call[1]["MessageBody"])
         assert body2["batchIndex"] == 1
-        assert body2["totalBatches"] == 2
-        assert len(body2["symbols"]) == 10
+        assert body2["totalBatches"] == 3
+        assert len(body2["symbols"]) == 25
 
     def test_sends_to_correct_queue_url(self):
         self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
@@ -79,9 +86,9 @@ class TestLambdaHandler:
         result = lambda_handler({}, None)
 
         assert result["statusCode"] == 200
-        assert result["body"]["totalSymbols"] == 3
-        assert result["body"]["totalBatches"] == 1
-        assert "runId" in result["body"]
+        assert json.loads(result["body"])["totalSymbols"] == 3
+        assert json.loads(result["body"])["totalBatches"] == 1
+        assert "runId" in json.loads(result["body"])
 
     def test_strips_whitespace_and_skips_empty_lines(self):
         body = b"  AAPL  \n\n  MSFT \n\n\n  GOOG  \n"
@@ -89,7 +96,7 @@ class TestLambdaHandler:
 
         result = lambda_handler({}, None)
 
-        assert result["body"]["totalSymbols"] == 3
+        assert json.loads(result["body"])["totalSymbols"] == 3
         body_sent = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
         assert body_sent["symbols"] == ["AAPL", "MSFT", "GOOG"]
 
@@ -99,15 +106,15 @@ class TestLambdaHandler:
         result = lambda_handler({}, None)
 
         import re
-        assert re.match(r"\d{4}-\d{2}-\d{2}", result["body"]["runId"])
+        assert re.match(r"\d{4}-\d{2}-\d{2}", json.loads(result["body"])["runId"])
 
     def test_exactly_batch_size_symbols(self):
-        symbols = [f"SYM{i}" for i in range(50)]
+        symbols = [f"SYM{i}" for i in range(25)]
         self.mock_s3.get_object.return_value = self._make_s3_response(symbols)
 
         result = lambda_handler({}, None)
 
-        assert result["body"]["totalBatches"] == 1
+        assert json.loads(result["body"])["totalBatches"] == 1
         assert self.mock_sqs.send_message.call_count == 1
 
     def test_single_symbol(self):
@@ -115,7 +122,7 @@ class TestLambdaHandler:
 
         result = lambda_handler({}, None)
 
-        assert result["body"]["totalBatches"] == 1
+        assert json.loads(result["body"])["totalBatches"] == 1
         body_sent = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
         assert body_sent["symbols"] == ["AAPL"]
         assert body_sent["totalBatches"] == 1
@@ -157,9 +164,13 @@ class TestLambdaHandler:
 
         result = lambda_handler({}, None)
 
-        assert result["body"]["vixSpikes"] == 2
+        assert json.loads(result["body"])["vixSpikes"] == 2
 
 
+class TestBatchSize:
+
+    def test_batch_size_is_50(self):
+        assert BATCH_SIZE == 25
 class TestDetectVixSpikes:
 
     def test_no_spikes_below_threshold(self):

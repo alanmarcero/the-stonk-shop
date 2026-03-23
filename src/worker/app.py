@@ -63,6 +63,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
             _write_errors(bucket, run_id, batch_index, result.errors)
 
         if _all_batches_complete(bucket, run_id, total_batches):
+            print(f"[worker] All {total_batches} batches complete. Aggregating.")
             _aggregate_results(bucket, run_id, total_batches, snapshot=snapshot)
             _invalidate_cache()
 

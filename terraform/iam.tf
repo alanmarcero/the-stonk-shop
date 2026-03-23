@@ -49,7 +49,7 @@ resource "aws_iam_role_policy" "orchestrator" {
       },
       {
         Effect   = "Allow"
-        Action   = ["sqs:SendMessage"]
+        Action   = ["sqs:SendMessage", "sqs:GetQueueAttributes"]
         Resource = aws_sqs_queue.batches.arn
       },
       {
