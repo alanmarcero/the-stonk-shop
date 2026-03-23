@@ -61,7 +61,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
         if result.errors:
             _write_errors(bucket, run_id, batch_index, result.errors)
 
-        if batch_index == total_batches - 1:
+        if _all_batches_complete(bucket, run_id, total_batches):
             _aggregate_results(bucket, run_id, total_batches)
             _invalidate_cache()
 
@@ -375,6 +375,18 @@ _RESULT_FILES = [
     ("-quarterly", {"quarterCrossovers", "quarterCrossdowns"}),
     ("-quarterly-below-above", {"quarterBelow", "quarterAbove"}),
 ]
+
+
+def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
+    """Check if all batch result files exist in S3."""
+    prefix = f"batches/{run_id}/"
+    try:
+        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        count = resp.get("KeyCount", 0)
+        return count >= total_batches
+    except Exception as err:
+        print(f"[worker] failed to list batches: {err}")
+        return False
 
 
 def _aggregate_results(bucket: str, run_id: str, total_batches: int) -> None:

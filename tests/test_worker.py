@@ -677,14 +677,18 @@ class TestLambdaHandler:
         self._errors_patcher = patch("src.worker.app._write_errors")
         self._agg_patcher = patch("src.worker.app._aggregate_results")
         self._inv_patcher = patch("src.worker.app._invalidate_cache")
+        self._all_batches_patcher = patch("src.worker.app._all_batches_complete")
         self._env_patcher.start()
         self.mock_process = self._process_patcher.start()
         self.mock_write = self._write_patcher.start()
         self.mock_errors = self._errors_patcher.start()
         self.mock_agg = self._agg_patcher.start()
         self.mock_invalidate = self._inv_patcher.start()
+        self.mock_all_batches = self._all_batches_patcher.start()
+        self.mock_all_batches.return_value = False
 
     def teardown_method(self):
+        self._all_batches_patcher.stop()
         self._inv_patcher.stop()
         self._agg_patcher.stop()
         self._errors_patcher.stop()
@@ -729,13 +733,13 @@ class TestLambdaHandler:
 
         self.mock_process.assert_called_once_with(["AAPL"], vix_spikes)
 
-    def test_last_batch_triggers_aggregation(self):
+    def test_all_batches_complete_triggers_aggregation(self):
         self.mock_process.return_value = BatchResult()
+        self.mock_all_batches.return_value = True
         event = self._sqs_event([{
             "runId": "2026-02-22",
-            "batchIndex": 2,
+            "batchIndex": 1,
             "totalBatches": 3,
-
             "symbols": ["AAPL"],
         }])
 
@@ -743,13 +747,13 @@ class TestLambdaHandler:
 
         self.mock_agg.assert_called_once_with("test-bucket", "2026-02-22", 3)
 
-    def test_non_last_batch_skips_aggregation(self):
+    def test_incomplete_batches_skips_aggregation(self):
         self.mock_process.return_value = BatchResult()
+        self.mock_all_batches.return_value = False
         event = self._sqs_event([{
             "runId": "2026-02-22",
             "batchIndex": 0,
             "totalBatches": 3,
-
             "symbols": ["AAPL"],
         }])
 
@@ -793,11 +797,11 @@ class TestLambdaHandler:
 
     def test_single_batch_total_triggers_aggregation(self):
         self.mock_process.return_value = BatchResult()
+        self.mock_all_batches.return_value = True
         event = self._sqs_event([{
             "runId": "2026-02-22",
             "batchIndex": 0,
             "totalBatches": 1,
-
             "symbols": ["AAPL"],
         }])
 
@@ -805,11 +809,12 @@ class TestLambdaHandler:
 
         self.mock_agg.assert_called_once()
 
-    def test_last_batch_invalidates_cache(self):
+    def test_all_batches_complete_invalidates_cache(self):
         self.mock_process.return_value = BatchResult()
+        self.mock_all_batches.return_value = True
         event = self._sqs_event([{
             "runId": "2026-02-22",
-            "batchIndex": 2,
+            "batchIndex": 1,
             "totalBatches": 3,
             "symbols": ["AAPL"],
         }])
@@ -818,8 +823,9 @@ class TestLambdaHandler:
 
         self.mock_invalidate.assert_called_once()
 
-    def test_non_last_batch_skips_invalidation(self):
+    def test_incomplete_batches_skips_invalidation(self):
         self.mock_process.return_value = BatchResult()
+        self.mock_all_batches.return_value = False
         event = self._sqs_event([{
             "runId": "2026-02-22",
             "batchIndex": 0,
