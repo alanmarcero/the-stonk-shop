@@ -34,7 +34,7 @@ resource "aws_lambda_function" "worker" {
   runtime                        = "python3.12"
   handler                        = "app.lambda_handler"
   memory_size                    = 128
-  timeout                        = 180
+  timeout                        = 300
 
 
   filename                       = data.archive_file.worker.output_path
