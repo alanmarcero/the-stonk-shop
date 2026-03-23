@@ -41,6 +41,14 @@ def lambda_handler(event: dict, context: Any) -> dict:
         "ApproximateNumberOfMessagesNotVisible",
         "ApproximateNumberOfMessagesDelayed",
     ])
+    
+    if is_http and event["requestContext"]["http"]["method"] == "GET":
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"running": in_flight > 0, "inFlight": in_flight})
+        }
+
     if in_flight > 0:
         msg = f"Scan already in progress (queue size: {in_flight})"
         print(f"[orchestrator] {msg}")

@@ -1896,34 +1896,73 @@ function _buildVixSpikeData(stats) {
 
 /* ── Fetch & init ── */
 
-async function fetchAll() {
+async function fetchAll(isSilentRefresh = false) {
   readHash();
 
   const btn = document.getElementById('run-scan-btn');
-  btn.addEventListener('click', async () => {
-    btn.disabled = true;
-    const oldText = btn.textContent;
-    btn.textContent = 'Starting...';
+  let isChecking = false;
+
+  async function checkScanStatus() {
+    if (isChecking) return;
+    isChecking = true;
     try {
-      const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'POST' });
-      if (res.status === 429) {
-        btn.textContent = 'Scan in progress';
-      } else if (res.ok) {
-        btn.textContent = 'Started!';
+      const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'GET' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.running) {
+          btn.textContent = 'In Progress...';
+          btn.disabled = true;
+          setTimeout(checkScanStatus, 60000);
+        } else {
+          if (btn.disabled) { // just finished
+             fetchAll(true);
+          }
+          btn.textContent = 'Run Scan';
+          btn.disabled = false;
+        }
       } else {
-        btn.textContent = 'Failed';
+        btn.textContent = 'Run Scan';
+        btn.disabled = false;
       }
     } catch (e) {
-      btn.textContent = 'Error';
-    }
-    setTimeout(() => {
-      btn.textContent = oldText;
+      btn.textContent = 'Run Scan';
       btn.disabled = false;
-    }, 3000);
-  });
+    }
+    isChecking = false;
+  }
+
+  // Only attach the listener once
+  if (!btn.hasAttribute('data-listener')) {
+    btn.setAttribute('data-listener', 'true');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Starting...';
+      try {
+        const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'POST' });
+        if (res.status === 429 || res.ok) {
+          btn.textContent = 'In Progress...';
+          setTimeout(checkScanStatus, 5000); // Check soon after starting
+        } else {
+          btn.textContent = 'Failed';
+          setTimeout(() => { btn.textContent = 'Run Scan'; btn.disabled = false; }, 3000);
+        }
+      } catch (e) {
+        btn.textContent = 'Error';
+        setTimeout(() => { btn.textContent = 'Run Scan'; btn.disabled = false; }, 3000);
+      }
+    });
+    
+    // Kick off initial poll
+    checkScanStatus();
+  }
 
   const cb = `_=${Date.now()}`;
   const urls = [...new Set(TAB_DEFS.filter(t => t.file).map(t => t.file))];
+  
+  if (!isSilentRefresh) {
+    document.getElementById('content').innerHTML = '<div class="loading">Loading scan data&hellip;</div>';
+  }
+
   const [manifestResult, statsResult, ...results] = await Promise.allSettled([
     fetch(`/results/manifest.json?${cb}`).then(r => {
       if (!r.ok) throw new Error(r.status);
