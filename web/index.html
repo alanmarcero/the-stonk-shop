@@ -368,17 +368,17 @@
   .row-count strong { color: var(--text-primary); font-weight: 600; }
 
   .quick-btn, .reset-btn {
-    padding: 4px 10px;
+    padding: 6px 14px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 28px;
+    min-height: 32px;
   }
 
   .quick-btn:hover {
@@ -775,9 +775,9 @@
 
     /* 5. Quick filters: horizontal scroll instead of wrapping */
     .toolbar .quick-btn, .toolbar .reset-btn {
-      font-size: 10.5px;
-      padding: 4px 10px;
-      min-height: 30px;
+      font-size: 12px;
+      padding: 6px 14px;
+      min-height: 34px;
       flex-shrink: 0;
       white-space: nowrap;
     }
@@ -824,7 +824,7 @@
     .source-group { gap: 3px; }
     .source-btn { padding: 3px 6px; font-size: 9.5px; min-height: 30px; }
     .toolbar { padding: 4px 6px 3px; }
-    .toolbar .quick-btn, .toolbar .reset-btn { font-size: 10px; padding: 3px 8px; min-height: 28px; }
+    .toolbar .quick-btn, .toolbar .reset-btn { font-size: 11px; padding: 5px 12px; min-height: 32px; }
     .content { padding: 4px 0 12px; }
     table { font-size: 10px; }
     th { padding: 5px 4px; font-size: 9px; }
@@ -1107,14 +1107,7 @@ const QUICK_FILTERS = [
   { id: 'high', label: 'High $', col: 'close', values: { min: 300, max: '' } },
 ];
 
-const COLOR_FILTERS = [
-  { id: 'ytdGreen',  label: 'YTD+',      test: r => r.ytdPct != null && r.ytdPct >= 0 },
-  { id: 'ytdRed',    label: 'YTD\u2212',  test: r => r.ytdPct != null && r.ytdPct < 0 },
-  { id: 'nearHigh',  label: 'Near High',  test: r => r.highPct != null && r.highPct >= -5 },
-  { id: 'offHigh',   label: 'Off High',   test: r => r.highPct != null && r.highPct < -5 },
-  { id: 'offLow',    label: 'Off Low',    test: r => r.lowPct != null && r.lowPct > 5 },
-  { id: 'nearLow',   label: 'Near Low',   test: r => r.lowPct != null && r.lowPct <= 5 },
-];
+const COLOR_FILTERS = [];
 
 const COLOR_FILTERS_MAP = new Map(COLOR_FILTERS.map(cf => [cf.id, cf]));
 
@@ -1136,11 +1129,8 @@ function renderToolbar(filteredCount, totalCount) {
   el.innerHTML =
     `<span class="row-count">Showing <strong>${filteredCount}</strong> of <strong>${totalCount}</strong></span>` +
     `<button class="quick-btn${lsCls}" id="low-signal-btn">Filter Low Signal</button>` +
-    `<button class="reset-btn" id="clear-filters-btn">Remove Filters</button>` +
-    `<div class="quick-sep"></div>` +
     quickBtns +
-    `<div class="quick-sep"></div>` +
-    colorBtns;
+    `<button class="reset-btn" id="clear-filters-btn">Remove Filters</button>`;
 
   document.getElementById('low-signal-btn').addEventListener('click', () => {
     state.lowSignalActive = !state.lowSignalActive;
