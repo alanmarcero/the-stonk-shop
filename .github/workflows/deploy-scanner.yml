@@ -59,6 +59,8 @@ jobs:
       - name: Terraform plan
         run: |
           cd terraform
+          terraform import aws_cloudwatch_log_group.orchestrator /aws/lambda/ema-scanner-orchestrator || true
+          terraform import aws_cloudwatch_log_group.worker /aws/lambda/ema-scanner-worker || true
           terraform plan -out=tfplan
 
       - name: Terraform apply
