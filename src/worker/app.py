@@ -8,6 +8,7 @@ from typing import Any, Optional
 import boto3
 
 # Dual import supports both Lambda (package) and direct test execution contexts.
+# Force update to ensure Name column is deployed.
 try:
     from . import ema, stats, yahoo
 except ImportError:
