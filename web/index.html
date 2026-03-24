@@ -1910,25 +1910,22 @@ async function fetchAll(isSilentRefresh = false) {
       if (res.ok) {
         const data = await res.json();
         if (data.running) {
-          btn.textContent = 'In Progress...';
+          btn.textContent = 'Scan in Progress';
           btn.disabled = true;
-          setTimeout(checkScanStatus, 60000);
+          setTimeout(checkScanStatus, 30000); // Poll every 30s instead of 60s
         } else {
-          if (btn.disabled) { // just finished
+          if (btn.disabled && btn.textContent === 'Scan in Progress') { // just finished
              fetchAll(true);
           }
           btn.textContent = 'Run Scan';
           btn.disabled = false;
         }
-      } else {
-        btn.textContent = 'Run Scan';
-        btn.disabled = false;
       }
     } catch (e) {
-      btn.textContent = 'Run Scan';
-      btn.disabled = false;
+      console.error('Status check failed:', e);
+    } finally {
+      isChecking = false;
     }
-    isChecking = false;
   }
 
   // Only attach the listener once
@@ -1940,8 +1937,8 @@ async function fetchAll(isSilentRefresh = false) {
       try {
         const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'POST' });
         if (res.status === 429 || res.ok) {
-          btn.textContent = 'In Progress...';
-          setTimeout(checkScanStatus, 5000); // Check soon after starting
+          btn.textContent = 'Scan in Progress';
+          setTimeout(checkScanStatus, 5000); 
         } else {
           btn.textContent = 'Failed';
           setTimeout(() => { btn.textContent = 'Run Scan'; btn.disabled = false; }, 3000);
@@ -1952,7 +1949,7 @@ async function fetchAll(isSilentRefresh = false) {
       }
     });
     
-    // Kick off initial poll
+    // Kick off initial poll immediately
     checkScanStatus();
   }
 

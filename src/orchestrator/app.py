@@ -66,17 +66,25 @@ def lambda_handler(event: dict, context: Any) -> dict:
     batches = [symbols[i : i + BATCH_SIZE] for i in range(0, len(symbols), BATCH_SIZE)]
     total_batches = len(batches)
 
+    # Send messages in batches of 10 for efficiency (SQS limit)
+    sqs_messages = []
     for idx, batch in enumerate(batches):
-        sqs.send_message(
-            QueueUrl=queue_url,
-            MessageBody=json.dumps({
+        sqs_messages.append({
+            "Id": f"batch_{idx}",
+            "MessageBody": json.dumps({
                 "runId": run_id,
                 "batchIndex": idx,
                 "totalBatches": total_batches,
                 "symbols": batch,
                 "vixSpikes": vix_spikes,
                 "snapshot": snapshot,
-            }),
+            })
+        })
+
+    for i in range(0, len(sqs_messages), 10):
+        sqs.send_message_batch(
+            QueueUrl=queue_url,
+            Entries=sqs_messages[i : i + 10]
         )
 
     return {

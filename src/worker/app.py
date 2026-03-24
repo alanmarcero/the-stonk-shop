@@ -107,6 +107,8 @@ def _aggregate_to_quarterly(closes: list[float], timestamps: list[int]) -> list[
 
 
 def _pct_diff(close: float, ema_value: float) -> float:
+    if not ema_value or ema_value <= 0:
+        return 0.0
     return round((close - ema_value) / ema_value * 100, 2)
 
 
@@ -480,20 +482,22 @@ def _compute_misc_stats(
 
     misc: dict = {}
 
-    if high_pcts:
+    if high_pcts and total > 0:
         within_5 = sum(1 for h in high_pcts if h >= -5)
         misc["pctWithin5OfHigh"] = round(within_5 / total * 100, 1)
 
     if ytd_pcts:
         positive_ytd = sum(1 for y in ytd_pcts if y >= 0)
-        misc["pctPositiveYTD"] = round(positive_ytd / total * 100, 1)
-        misc["avgYTD"] = round(sum(ytd_pcts) / len(ytd_pcts), 2)
+        if total > 0:
+            misc["pctPositiveYTD"] = round(positive_ytd / total * 100, 1)
+        if len(ytd_pcts) > 0:
+            misc["avgYTD"] = round(sum(ytd_pcts) / len(ytd_pcts), 2)
 
     if forward_pes:
         misc["avgForwardPE"] = round(sum(forward_pes) / len(forward_pes), 2)
         sorted_pes = sorted(forward_pes)
         mid = len(sorted_pes) // 2
-        if len(sorted_pes) % 2 == 0:
+        if len(sorted_pes) % 2 == 0 and mid > 0:
             misc["medianForwardPE"] = round((sorted_pes[mid - 1] + sorted_pes[mid]) / 2, 2)
         else:
             misc["medianForwardPE"] = round(sorted_pes[mid], 2)

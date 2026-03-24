@@ -33,6 +33,8 @@ def compute_highest_close_pct(closes: list[float]) -> Optional[tuple[float, floa
     if not closes:
         return None
     high = max(closes)
+    if high <= 0:
+        return 0.0, high
     pct = round((closes[-1] - high) / high * 100, 2)
     return pct, high
 
@@ -43,6 +45,8 @@ def compute_lowest_close_pct(closes: list[float]) -> Optional[tuple[float, float
         return None
     window = closes[-252:] if len(closes) >= 252 else closes
     low = min(window)
+    if low <= 0:
+        return 0.0, low
     pct = round((closes[-1] - low) / low * 100, 2)
     return pct, low
 
@@ -127,13 +131,19 @@ def compute_stats(
     if len(closes) >= 200:
         sma200d = round(sum(closes[-200:]) / 200, 2)
         stats["sma200d"] = sma200d
-        stats["pctSma200d"] = round((closes[-1] - sma200d) / sma200d * 100, 2)
+        if sma200d > 0:
+            stats["pctSma200d"] = round((closes[-1] - sma200d) / sma200d * 100, 2)
+        else:
+            stats["pctSma200d"] = 0.0
 
     # 200-week SMA
     if weekly_closes is not None and len(weekly_closes) >= 200:
         sma200w = round(sum(weekly_closes[-200:]) / 200, 2)
         stats["sma200w"] = sma200w
-        stats["pctSma200w"] = round((closes[-1] - sma200w) / sma200w * 100, 2)
+        if sma200w > 0:
+            stats["pctSma200w"] = round((closes[-1] - sma200w) / sma200w * 100, 2)
+        else:
+            stats["pctSma200w"] = 0.0
 
     # Forward P/E
     if forward_pe is not None:
