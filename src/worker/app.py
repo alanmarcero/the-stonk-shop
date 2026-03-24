@@ -112,9 +112,10 @@ def _pct_diff(close: float, ema_value: float) -> float:
     return round((close - ema_value) / ema_value * 100, 2)
 
 
-def _above_entry(symbol: str, close: float, ema_value: float, count: int) -> dict:
+def _above_entry(symbol: str, name: str, close: float, ema_value: float, count: int) -> dict:
     return {
         "symbol": symbol,
+        "name": name,
         "close": close,
         "ema": round(ema_value, 4),
         "pctAbove": _pct_diff(close, ema_value),
@@ -122,9 +123,10 @@ def _above_entry(symbol: str, close: float, ema_value: float, count: int) -> dic
     }
 
 
-def _below_entry(symbol: str, close: float, ema_value: float, count: int) -> dict:
+def _below_entry(symbol: str, name: str, close: float, ema_value: float, count: int) -> dict:
     return {
         "symbol": symbol,
+        "name": name,
         "close": close,
         "ema": round(ema_value, 4),
         "pctBelow": _pct_diff(ema_value, close),
@@ -132,9 +134,10 @@ def _below_entry(symbol: str, close: float, ema_value: float, count: int) -> dic
     }
 
 
-def _crossover_entry(symbol: str, close: float, ema_value: float, periods_below: int, period_key: str) -> dict:
+def _crossover_entry(symbol: str, name: str, close: float, ema_value: float, periods_below: int, period_key: str) -> dict:
     return {
         "symbol": symbol,
+        "name": name,
         "close": close,
         "ema": round(ema_value, 4),
         "pctAbove": _pct_diff(close, ema_value),
@@ -142,9 +145,10 @@ def _crossover_entry(symbol: str, close: float, ema_value: float, periods_below:
     }
 
 
-def _crossdown_entry(symbol: str, close: float, ema_value: float, periods_above: int, period_key: str) -> dict:
+def _crossdown_entry(symbol: str, name: str, close: float, ema_value: float, periods_above: int, period_key: str) -> dict:
     return {
         "symbol": symbol,
+        "name": name,
         "close": close,
         "ema": round(ema_value, 4),
         "pctBelow": _pct_diff(ema_value, close),
@@ -190,22 +194,29 @@ def _process_batch(
             batch.errors.append({"symbol": symbol, "error": "Failed to fetch candles"})
             continue
 
-        daily_above, daily_below = _process_daily(symbol, daily_result)
+        # Extract name from either successful fetch
+        name = ""
+        if weekly_result:
+            name = weekly_result[2]
+        elif daily_result:
+            name = daily_result[2]
+
+        daily_above, daily_below = _process_daily(symbol, name, daily_result)
         if daily_above is not None:
             batch.day_above.append(daily_above)
         if daily_below is not None:
             batch.day_below.append(daily_below)
 
         weekly = _process_timeframe(
-            symbol, weekly_result, "weeksBelow", "weeksAbove",
+            symbol, name, weekly_result, "weeksBelow", "weeksAbove",
             min_below=MIN_WEEKS_THRESHOLD,
         )
         monthly = _process_timeframe(
-            symbol, weekly_result, "monthsBelow", "monthsAbove",
+            symbol, name, weekly_result, "monthsBelow", "monthsAbove",
             aggregate_fn=_aggregate_to_monthly,
         )
         quarterly = _process_timeframe(
-            symbol, weekly_result, "quartersBelow", "quartersAbove",
+            symbol, name, weekly_result, "quartersBelow", "quartersAbove",
             aggregate_fn=_aggregate_to_quarterly,
         )
 
@@ -225,8 +236,9 @@ def _process_batch(
             )
             if computed is not None:
                 computed["symbol"] = symbol
+                computed["name"] = name
                 if symbol == "VOO":
-                    closes, timestamps = daily_result
+                    closes, timestamps = daily_result[0], daily_result[1]
                     election = stats.compute_return_since(closes, timestamps, 2024, 11, 5)
                     if election is not None:
                         computed["spxSinceElection"] = election
@@ -240,7 +252,8 @@ def _process_batch(
 
 def _process_daily(
     symbol: str,
-    daily_result: Optional[tuple[list[float], list[int]]],
+    name: str,
+    daily_result: Optional[tuple[list[float], list[int], str]],
 ) -> tuple[Optional[dict], Optional[dict]]:
     """Process daily candles for a symbol.
 
@@ -257,19 +270,20 @@ def _process_daily(
     above_entry = None
     above_count = ema.count_periods_above(daily_closes)
     if above_count is not None:
-        above_entry = _above_entry(symbol, last_close, daily_ema_value, above_count)
+        above_entry = _above_entry(symbol, name, last_close, daily_ema_value, above_count)
 
     below_entry = None
     below_count = ema.count_periods_below(daily_closes)
     if below_count is not None:
-        below_entry = _below_entry(symbol, last_close, daily_ema_value, below_count)
+        below_entry = _below_entry(symbol, name, last_close, daily_ema_value, below_count)
 
     return above_entry, below_entry
 
 
 def _process_timeframe(
     symbol: str,
-    candle_result: Optional[tuple[list[float], list[int]]],
+    name: str,
+    candle_result: Optional[tuple[list[float], list[int], str]],
     cross_up_key: str,
     cross_down_key: str,
     aggregate_fn=None,
@@ -294,22 +308,22 @@ def _process_timeframe(
     crossover = None
     periods_below = ema.detect_weekly_crossover(closes)
     if periods_below is not None:
-        crossover = _crossover_entry(symbol, last_close, ema_value, periods_below, cross_up_key)
+        crossover = _crossover_entry(symbol, name, last_close, ema_value, periods_below, cross_up_key)
 
     crossdown = None
     periods_above = ema.detect_weekly_crossdown(closes)
     if periods_above is not None:
-        crossdown = _crossdown_entry(symbol, last_close, ema_value, periods_above, cross_down_key)
+        crossdown = _crossdown_entry(symbol, name, last_close, ema_value, periods_above, cross_down_key)
 
     below = None
     below_count = ema.count_periods_below(closes)
     if below_count is not None and below_count >= min_below:
-        below = _below_entry(symbol, last_close, ema_value, below_count)
+        below = _below_entry(symbol, name, last_close, ema_value, below_count)
 
     above = None
     above_count = ema.count_periods_above(closes)
     if above_count is not None:
-        above = _above_entry(symbol, last_close, ema_value, above_count)
+        above = _above_entry(symbol, name, last_close, ema_value, above_count)
 
     return {"crossover": crossover, "crossdown": crossdown, "below": below, "above": above}
 

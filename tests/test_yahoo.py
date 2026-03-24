@@ -16,6 +16,7 @@ class TestParseResponse:
         data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "Apple Inc."},
                     "timestamp": [1000, 2000, 3000],
                     "indicators": {
                         "quote": [{"close": [100.0, 101.5, 102.0]}]
@@ -27,14 +28,29 @@ class TestParseResponse:
         result = _parse_response(data)
 
         assert result is not None
-        closes, timestamps = result
+        closes, timestamps, name = result
         assert closes == [100.0, 101.5, 102.0]
         assert timestamps == [1000, 2000, 3000]
+        assert name == "Apple Inc."
+
+    def test_valid_response_long_name_fallback(self):
+        data = {
+            "chart": {
+                "result": [{
+                    "meta": {"longName": "Microsoft Corporation"},
+                    "timestamp": [1000],
+                    "indicators": {"quote": [{"close": [200.0]}]},
+                }]
+            }
+        }
+        closes, timestamps, name = _parse_response(data)
+        assert name == "Microsoft Corporation"
 
     def test_filters_null_closes(self):
         data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "Test"},
                     "timestamp": [1000, 2000, 3000, 4000],
                     "indicators": {
                         "quote": [{"close": [100.0, None, 102.0, None]}]
@@ -45,7 +61,7 @@ class TestParseResponse:
 
         result = _parse_response(data)
 
-        closes, timestamps = result
+        closes, timestamps, name = result
         assert closes == [100.0, 102.0]
         assert timestamps == [1000, 3000]
 
@@ -121,15 +137,17 @@ class TestParseResponse:
         data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "Test"},
                     "timestamp": [1000],
                     "indicators": {"quote": [{"close": [99.5]}]},
                 }]
             }
         }
 
-        closes, timestamps = _parse_response(data)
+        closes, timestamps, name = _parse_response(data)
         assert closes == [99.5]
         assert timestamps == [1000]
+        assert name == "Test"
 
 
 class TestFetchDailyCandles:
@@ -139,6 +157,7 @@ class TestFetchDailyCandles:
         response_data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "AAPL"},
                     "timestamp": [1000, 2000],
                     "indicators": {"quote": [{"close": [150.0, 155.0]}]},
                 }]
@@ -153,9 +172,10 @@ class TestFetchDailyCandles:
         result = fetch_daily_candles("AAPL")
 
         assert result is not None
-        closes, timestamps = result
+        closes, timestamps, name = result
         assert closes == [150.0, 155.0]
         assert timestamps == [1000, 2000]
+        assert name == "AAPL"
 
     @patch("src.worker.yahoo.urllib.request.urlopen")
     def test_builds_correct_url(self, mock_urlopen):
@@ -218,6 +238,7 @@ class TestFetchQuarterlyCandles:
         response_data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "AAPL"},
                     "timestamp": [1771218000, 1771822800],
                     "indicators": {"quote": [{"close": [150.0, 155.0]}]},
                 }]
@@ -232,9 +253,10 @@ class TestFetchQuarterlyCandles:
         result = fetch_quarterly_candles("AAPL")
 
         assert result is not None
-        closes, timestamps = result
+        closes, timestamps, name = result
         assert closes == [150.0, 155.0]
         assert timestamps == [1771218000, 1771822800]
+        assert name == "AAPL"
 
     @patch("src.worker.yahoo.urllib.request.urlopen")
     def test_network_error_returns_none(self, mock_urlopen):
@@ -250,6 +272,7 @@ class TestFetchMonthlyCandles:
         response_data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "AAPL"},
                     "timestamp": [1771218000, 1771822800],
                     "indicators": {"quote": [{"close": [150.0, 155.0]}]},
                 }]
@@ -264,9 +287,10 @@ class TestFetchMonthlyCandles:
         result = fetch_monthly_candles("AAPL")
 
         assert result is not None
-        closes, timestamps = result
+        closes, timestamps, name = result
         assert closes == [150.0, 155.0]
         assert timestamps == [1771218000, 1771822800]
+        assert name == "AAPL"
 
     @patch("src.worker.yahoo.urllib.request.urlopen")
     def test_builds_correct_url(self, mock_urlopen):
@@ -515,6 +539,7 @@ class TestFetchStatsCandles:
         response_data = {
             "chart": {
                 "result": [{
+                    "meta": {"shortName": "AAPL"},
                     "timestamp": [1000, 2000],
                     "indicators": {"quote": [{"close": [150.0, 155.0]}]},
                 }]
@@ -529,13 +554,12 @@ class TestFetchStatsCandles:
         result = fetch_stats_candles("AAPL")
 
         assert result is not None
-        closes, timestamps = result
+        closes, timestamps, name = result
         assert closes == [150.0, 155.0]
+        assert name == "AAPL"
 
     @patch("src.worker.yahoo.urllib.request.urlopen")
     def test_network_error_returns_none(self, mock_urlopen):
         mock_urlopen.side_effect = ConnectionError("no network")
 
         assert fetch_stats_candles("FAIL") is None
-
-

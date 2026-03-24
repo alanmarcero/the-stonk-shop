@@ -14,6 +14,10 @@ output "orchestrator_arn" {
   value = aws_lambda_function.orchestrator.arn
 }
 
+output "orchestrator_url" {
+  value = aws_lambda_function_url.orchestrator_url.function_url
+}
+
 output "worker_arn" {
   value = aws_lambda_function.worker.arn
 }

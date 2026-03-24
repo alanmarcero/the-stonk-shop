@@ -61,31 +61,33 @@ class TestProcessBatch:
         self._yahoo_patcher.stop()
 
     def test_crossover_detected(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "Test Name")
 
         result = _process_batch(["TEST"])
 
         assert len(result.crossovers) == 1
         assert result.crossovers[0]["symbol"] == "TEST"
+        assert result.crossovers[0]["name"] == "Test Name"
         assert result.crossovers[0]["close"] == 106.0
         assert result.crossovers[0]["weeksBelow"] == 3
         assert result.crossovers[0]["pctAbove"] > 0
         assert len(result.errors) == 0
 
     def test_crossover_output_fields(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "Apple Inc.")
 
         result = _process_batch(["AAPL"])
 
         entry = result.crossovers[0]
-        assert set(entry.keys()) == {"symbol", "close", "ema", "pctAbove", "weeksBelow"}
+        assert set(entry.keys()) == {"symbol", "name", "close", "ema", "pctAbove", "weeksBelow"}
+        assert entry["name"] == "Apple Inc."
         assert isinstance(entry["close"], float)
         assert isinstance(entry["ema"], float)
         assert isinstance(entry["pctAbove"], float)
         assert isinstance(entry["weeksBelow"], int)
 
     def test_crossover_ema_rounded_to_4_decimals(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "X")
 
         result = _process_batch(["X"])
 
@@ -94,7 +96,7 @@ class TestProcessBatch:
         assert len(decimals) <= 4
 
     def test_crossover_pct_above_rounded_to_2_decimals(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "X")
 
         result = _process_batch(["X"])
 
@@ -102,26 +104,27 @@ class TestProcessBatch:
         assert pct == round(pct, 2)
 
     def test_week_below_detected_with_minimum_weeks(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "Test Name")
 
         result = _process_batch(["TEST"])
 
         assert len(result.week_below) == 1
         assert result.week_below[0]["symbol"] == "TEST"
+        assert result.week_below[0]["name"] == "Test Name"
         assert result.week_below[0]["count"] == 3
         assert result.week_below[0]["pctBelow"] > 0
 
     def test_week_below_output_fields(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "X")
 
         result = _process_batch(["X"])
 
         entry = result.week_below[0]
-        assert set(entry.keys()) == {"symbol", "close", "ema", "pctBelow", "count"}
+        assert set(entry.keys()) == {"symbol", "name", "close", "ema", "pctBelow", "count"}
 
     def test_week_below_not_detected_under_threshold(self):
         closes = [50.0, 52.0, 54.0, 56.0, 58.0, 56.0, 53.0]
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (closes, _timestamps_for(closes))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (closes, _timestamps_for(closes), "Test")
 
         result = _process_batch(["TEST"])
 
@@ -129,14 +132,14 @@ class TestProcessBatch:
 
     def test_week_below_two_weeks_not_detected(self):
         closes = [100.0, 102.0, 104.0, 106.0, 108.0, 100.0, 101.0]
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (closes, _timestamps_for(closes))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (closes, _timestamps_for(closes), "Test")
 
         result = _process_batch(["TEST"])
 
         assert len(result.week_below) == 0
 
     def test_uptrend_no_crossover_no_below(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "Bull")
 
         result = _process_batch(["BULL"])
 
@@ -158,7 +161,7 @@ class TestProcessBatch:
         assert "error" in result.errors[0]
 
     def test_insufficient_data_skipped_no_error(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = ([100.0, 101.0, 102.0], [1, 2, 3])
+        self.mock_yahoo.fetch_quarterly_candles.return_value = ([100.0, 101.0, 102.0], [1, 2, 3], "Short")
 
         result = _process_batch(["SHORT"])
 
@@ -167,7 +170,7 @@ class TestProcessBatch:
         assert len(result.errors) == 0
 
     def test_multiple_symbols_rate_limited(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "A")
 
         _process_batch(["A", "B", "C"])
 
@@ -175,7 +178,7 @@ class TestProcessBatch:
         self.mock_time.sleep.assert_called_with(1)
 
     def test_single_symbol_no_sleep(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "Only")
 
         _process_batch(["ONLY"])
 
@@ -185,7 +188,7 @@ class TestProcessBatch:
         def weekly_side_effect(symbol):
             if symbol == "FAIL":
                 return None
-            return (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+            return (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "Ok")
 
         self.mock_yahoo.fetch_quarterly_candles.side_effect = weekly_side_effect
 
@@ -220,47 +223,49 @@ class TestProcessBatch:
         assert len(result.errors) == 3
 
     def test_day_above_detected(self):
-        self.mock_yahoo.fetch_stats_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_stats_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "Bull")
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "Bull")
 
         result = _process_batch(["BULL"])
 
         assert len(result.day_above) == 1
         assert result.day_above[0]["symbol"] == "BULL"
+        assert result.day_above[0]["name"] == "Bull"
         assert result.day_above[0]["count"] == 6
         assert result.day_above[0]["pctAbove"] > 0
 
     def test_day_above_output_fields(self):
-        self.mock_yahoo.fetch_stats_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_stats_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "X")
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "X")
 
         result = _process_batch(["X"])
 
         entry = result.day_above[0]
-        assert set(entry.keys()) == {"symbol", "close", "ema", "pctAbove", "count"}
+        assert set(entry.keys()) == {"symbol", "name", "close", "ema", "pctAbove", "count"}
         assert isinstance(entry["count"], int)
 
     def test_week_above_detected(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "Bull")
 
         result = _process_batch(["BULL"])
 
         assert len(result.week_above) == 1
         assert result.week_above[0]["symbol"] == "BULL"
+        assert result.week_above[0]["name"] == "Bull"
         assert result.week_above[0]["count"] == 6
         assert result.week_above[0]["pctAbove"] > 0
 
     def test_week_above_output_fields(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "X")
 
         result = _process_batch(["X"])
 
         entry = result.week_above[0]
-        assert set(entry.keys()) == {"symbol", "close", "ema", "pctAbove", "count"}
+        assert set(entry.keys()) == {"symbol", "name", "close", "ema", "pctAbove", "count"}
 
     def test_daily_fail_still_processes_weekly(self):
         self.mock_yahoo.fetch_stats_candles.return_value = None
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "Test")
 
         result = _process_batch(["TEST"])
 
@@ -268,7 +273,7 @@ class TestProcessBatch:
         assert len(result.errors) == 0
 
     def test_weekly_fail_still_processes_daily(self):
-        self.mock_yahoo.fetch_stats_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES))
+        self.mock_yahoo.fetch_stats_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "Test")
         self.mock_yahoo.fetch_quarterly_candles.return_value = None
 
         result = _process_batch(["TEST"])
@@ -286,8 +291,8 @@ class TestProcessBatch:
         assert result.errors[0]["symbol"] == "FAIL"
 
     def test_below_ema_not_in_above_lists(self):
-        self.mock_yahoo.fetch_stats_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_stats_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "Bear")
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "Bear")
 
         result = _process_batch(["BEAR"])
 
@@ -295,46 +300,48 @@ class TestProcessBatch:
         assert len(result.week_above) == 0
 
     def test_crossdown_detected(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES), "Test")
 
         result = _process_batch(["TEST"])
 
         assert len(result.crossdowns) == 1
         assert result.crossdowns[0]["symbol"] == "TEST"
+        assert result.crossdowns[0]["name"] == "Test"
         assert result.crossdowns[0]["weeksAbove"] == 4
         assert result.crossdowns[0]["pctBelow"] >= 0
 
     def test_crossdown_output_fields(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES))
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES), "X")
 
         result = _process_batch(["X"])
 
         entry = result.crossdowns[0]
-        assert set(entry.keys()) == {"symbol", "close", "ema", "pctBelow", "weeksAbove"}
+        assert set(entry.keys()) == {"symbol", "name", "close", "ema", "pctBelow", "weeksAbove"}
         assert isinstance(entry["close"], float)
         assert isinstance(entry["ema"], float)
         assert isinstance(entry["pctBelow"], float)
         assert isinstance(entry["weeksAbove"], int)
 
     def test_day_below_detected(self):
-        self.mock_yahoo.fetch_stats_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_stats_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "Bear")
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "Bear")
 
         result = _process_batch(["BEAR"])
 
         assert len(result.day_below) == 1
         assert result.day_below[0]["symbol"] == "BEAR"
+        assert result.day_below[0]["name"] == "Bear"
         assert result.day_below[0]["count"] == 3
         assert result.day_below[0]["pctBelow"] > 0
 
     def test_day_below_output_fields(self):
-        self.mock_yahoo.fetch_stats_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES))
+        self.mock_yahoo.fetch_stats_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "X")
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "X")
 
         result = _process_batch(["X"])
 
         entry = result.day_below[0]
-        assert set(entry.keys()) == {"symbol", "close", "ema", "pctBelow", "count"}
+        assert set(entry.keys()) == {"symbol", "name", "close", "ema", "pctBelow", "count"}
 
     def test_monthly_crossover_detected(self):
         # _aggregate_to_monthly turns weekly closes into monthly last-closes
@@ -345,12 +352,13 @@ class TestProcessBatch:
             int(datetime(2024, m, 15, tzinfo=timezone.utc).timestamp())
             for m in range(1, 10)
         ]
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (monthly_closes, timestamps)
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (monthly_closes, timestamps, "Test")
 
         result = _process_batch(["TEST"])
 
         assert len(result.month_crossovers) == 1
         assert result.month_crossovers[0]["symbol"] == "TEST"
+        assert result.month_crossovers[0]["name"] == "Test"
         assert "monthsBelow" in result.month_crossovers[0]
 
     def test_monthly_crossdown_detected(self):
@@ -360,12 +368,13 @@ class TestProcessBatch:
             int(datetime(2024, m, 15, tzinfo=timezone.utc).timestamp())
             for m in range(1, 10)
         ]
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (monthly_closes, timestamps)
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (monthly_closes, timestamps, "Test")
 
         result = _process_batch(["TEST"])
 
         assert len(result.month_crossdowns) == 1
         assert result.month_crossdowns[0]["symbol"] == "TEST"
+        assert result.month_crossdowns[0]["name"] == "Test"
         assert "monthsAbove" in result.month_crossdowns[0]
 
     def test_quarterly_crossover_detected(self):
@@ -376,17 +385,18 @@ class TestProcessBatch:
             int(datetime(2022 + i // 4, (i % 4) * 3 + 2, 15, tzinfo=timezone.utc).timestamp())
             for i in range(9)
         ]
-        self.mock_yahoo.fetch_quarterly_candles.return_value = (quarterly_closes, timestamps)
+        self.mock_yahoo.fetch_quarterly_candles.return_value = (quarterly_closes, timestamps, "Test")
 
         result = _process_batch(["TEST"])
 
         assert len(result.quarter_crossovers) == 1
         assert result.quarter_crossovers[0]["symbol"] == "TEST"
+        assert result.quarter_crossovers[0]["name"] == "Test"
         assert "quartersBelow" in result.quarter_crossovers[0]
 
     def test_stats_computed_when_stats_candles_available(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)))
-        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000])
+        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "AAPL")
+        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "AAPL")
         self.mock_yahoo.fetch_forward_pe.return_value = (18.5, {"Q3'25": 18.5})
         self.mock_stats.compute_stats.return_value = {"close": 105.0, "ytdPct": 5.0}
 
@@ -394,11 +404,12 @@ class TestProcessBatch:
 
         assert len(result.stats_data) == 1
         assert result.stats_data[0]["symbol"] == "AAPL"
+        assert result.stats_data[0]["name"] == "AAPL"
         assert result.stats_data[0]["close"] == 105.0
 
     def test_voo_includes_election_and_inauguration_returns(self):
-        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)))
-        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000])
+        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "VOO")
+        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "VOO")
         self.mock_yahoo.fetch_forward_pe.return_value = (None, None)
         self.mock_stats.compute_stats.return_value = {"close": 105.0}
         self.mock_stats.compute_return_since.side_effect = [12.5, -3.0]
@@ -593,22 +604,22 @@ class TestWriteBatchResults:
 
     @patch("src.worker.app.s3")
     def test_body_contains_all_fields(self, mock_s3):
-        crossovers = [{"symbol": "AAPL", "weeksBelow": 3}]
-        crossdowns = [{"symbol": "NVDA", "weeksAbove": 5}]
-        day_below = [{"symbol": "AMZN", "count": 2}]
-        week_below = [{"symbol": "MSFT", "count": 4}]
-        day_above = [{"symbol": "GOOG", "count": 5}]
-        week_above = [{"symbol": "TSLA", "count": 3}]
+        crossovers = [{"symbol": "AAPL", "name": "Apple", "weeksBelow": 3}]
+        crossdowns = [{"symbol": "NVDA", "name": "Nvidia", "weeksAbove": 5}]
+        day_below = [{"symbol": "AMZN", "name": "Amazon", "count": 2}]
+        week_below = [{"symbol": "MSFT", "name": "Microsoft", "count": 4}]
+        day_above = [{"symbol": "GOOG", "name": "Google", "count": 5}]
+        week_above = [{"symbol": "TSLA", "name": "Tesla", "count": 3}]
 
-        month_crossovers = [{"symbol": "META", "monthsBelow": 2}]
-        month_crossdowns = [{"symbol": "NFLX", "monthsAbove": 3}]
-        month_below = [{"symbol": "INTC", "count": 4}]
-        month_above = [{"symbol": "AMD", "count": 2}]
-        quarter_crossovers = [{"symbol": "V", "quartersBelow": 3}]
-        quarter_crossdowns = [{"symbol": "MA", "quartersAbove": 2}]
-        quarter_below = [{"symbol": "PYPL", "count": 5}]
-        quarter_above = [{"symbol": "SQ", "count": 3}]
-        stats_data = [{"symbol": "AAPL", "close": 195.5, "ytdPct": 12.34}]
+        month_crossovers = [{"symbol": "META", "name": "Meta", "monthsBelow": 2}]
+        month_crossdowns = [{"symbol": "NFLX", "name": "Netflix", "monthsAbove": 3}]
+        month_below = [{"symbol": "INTC", "name": "Intel", "count": 4}]
+        month_above = [{"symbol": "AMD", "name": "AMD", "count": 2}]
+        quarter_crossovers = [{"symbol": "V", "name": "Visa", "quartersBelow": 3}]
+        quarter_crossdowns = [{"symbol": "MA", "name": "Mastercard", "quartersAbove": 2}]
+        quarter_below = [{"symbol": "PYPL", "name": "Paypal", "count": 5}]
+        quarter_above = [{"symbol": "SQ", "name": "Square", "count": 3}]
+        stats_data = [{"symbol": "AAPL", "name": "Apple", "close": 195.5, "ytdPct": 12.34}]
         error_details = [{"symbol": "BAD", "error": "fail"}]
 
         batch = BatchResult(
@@ -878,20 +889,20 @@ class TestAggregateResults:
             {
                 "symbolsProcessed": 50,
                 "errors": 1,
-                "crossovers": [{"symbol": "AAPL", "weeksBelow": 5}],
-                "dayBelow": [{"symbol": "X", "count": 4}],
+                "crossovers": [{"symbol": "AAPL", "name": "Apple", "weeksBelow": 5}],
+                "dayBelow": [{"symbol": "X", "name": "X", "count": 4}],
                 "weekBelow": [],
-                "dayAbove": [{"symbol": "GOOG", "count": 3}],
+                "dayAbove": [{"symbol": "GOOG", "name": "Google", "count": 3}],
                 "weekAbove": [],
             },
             {
                 "symbolsProcessed": 50,
                 "errors": 0,
-                "crossovers": [{"symbol": "MSFT", "weeksBelow": 3}],
+                "crossovers": [{"symbol": "MSFT", "name": "Microsoft", "weeksBelow": 3}],
                 "dayBelow": [],
-                "weekBelow": [{"symbol": "Y", "count": 5}],
+                "weekBelow": [{"symbol": "Y", "name": "Y", "count": 5}],
                 "dayAbove": [],
-                "weekAbove": [{"symbol": "TSLA", "count": 2}],
+                "weekAbove": [{"symbol": "TSLA", "name": "Tesla", "count": 2}],
             },
         ]
 

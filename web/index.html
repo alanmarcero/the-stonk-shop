@@ -503,6 +503,19 @@
     background: inherit;
   }
 
+  td.name {
+    text-align: left;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+  }
+
+  th.col-name { text-align: left; min-width: 140px; }
+
   /* Ensure striping colors persist on frozen column */
   tbody tr:nth-child(odd) td.symbol { background: var(--bg-surface); }
   tbody tr:nth-child(even) td.symbol { background: var(--bg-base); }
@@ -909,20 +922,20 @@ const DEFAULT_FILTERS = {
 };
 
 const TAB_DEFS = [
-  { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
-  { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
-  { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'weekAbove',   label: 'Wk Above',       file: '/results/latest-above.json',                 key: 'weekAbove',       cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'dayBelow',    label: 'Day Below',      file: '/results/latest-below.json',                 key: 'dayBelow',        cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'dayAbove',    label: 'Day Above',      file: '/results/latest-above.json',                 key: 'dayAbove',        cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'moCrossUp',   label: 'Mo Cross Up',    file: '/results/latest-monthly.json',               key: 'monthCrossovers', cols: ['symbol','close','monthsBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctAbove' },
-  { id: 'moCrossDown', label: 'Mo Cross Down',  file: '/results/latest-monthly.json',               key: 'monthCrossdowns', cols: ['symbol','close','monthsAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctBelow' },
-  { id: 'moBelow',     label: 'Mo Below',       file: '/results/latest-monthly-below-above.json',   key: 'monthBelow',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'moAbove',     label: 'Mo Above',       file: '/results/latest-monthly-below-above.json',   key: 'monthAbove',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'qCrossUp',   label: 'Q Cross Up',     file: '/results/latest-quarterly.json',              key: 'quarterCrossovers', cols: ['symbol','close','quartersBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctAbove' },
-  { id: 'qCrossDown', label: 'Q Cross Down',   file: '/results/latest-quarterly.json',              key: 'quarterCrossdowns', cols: ['symbol','close','quartersAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctBelow' },
-  { id: 'qBelow',     label: 'Q Below',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterBelow',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'qAbove',     label: 'Q Above',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterAbove',      cols: ['symbol','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','name','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
+  { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
+  { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'weekAbove',   label: 'Wk Above',       file: '/results/latest-above.json',                 key: 'weekAbove',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'dayBelow',    label: 'Day Below',      file: '/results/latest-below.json',                 key: 'dayBelow',        cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'dayAbove',    label: 'Day Above',      file: '/results/latest-above.json',                 key: 'dayAbove',        cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'moCrossUp',   label: 'Mo Cross Up',    file: '/results/latest-monthly.json',               key: 'monthCrossovers', cols: ['symbol','name','close','monthsBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctAbove' },
+  { id: 'moCrossDown', label: 'Mo Cross Down',  file: '/results/latest-monthly.json',               key: 'monthCrossdowns', cols: ['symbol','name','close','monthsAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctBelow' },
+  { id: 'moBelow',     label: 'Mo Below',       file: '/results/latest-monthly-below-above.json',   key: 'monthBelow',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'moAbove',     label: 'Mo Above',       file: '/results/latest-monthly-below-above.json',   key: 'monthAbove',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
+  { id: 'qCrossUp',   label: 'Q Cross Up',     file: '/results/latest-quarterly.json',              key: 'quarterCrossovers', cols: ['symbol','name','close','quartersBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctAbove' },
+  { id: 'qCrossDown', label: 'Q Cross Down',   file: '/results/latest-quarterly.json',              key: 'quarterCrossdowns', cols: ['symbol','name','close','quartersAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctBelow' },
+  { id: 'qBelow',     label: 'Q Below',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterBelow',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
+  { id: 'qAbove',     label: 'Q Above',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterAbove',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
   { id: 'performance', label: 'YTD Stats',        special: 'performance' },
   { id: 'priceBreaks', label: 'Price Breaks',   special: 'priceBreaks' },
   { id: 'sinceQ',      label: 'Since Quarter',  special: 'sinceQuarter' },
@@ -933,7 +946,7 @@ const TAB_DEFS = [
 ];
 
 const COL_LABELS = {
-  symbol: 'Symbol', close: 'Close', ema: 'EMA', pct: '% EMA',
+  symbol: 'Symbol', name: 'Name', close: 'Close', ema: 'EMA', pct: '% EMA',
   weeksBelow: 'Weeks Below', weeksAbove: 'Weeks Above',
   monthsBelow: 'Months Below', monthsAbove: 'Months Above',
   quartersBelow: 'Quarters Below', quartersAbove: 'Quarters Above',
@@ -1609,6 +1622,7 @@ function populateTabData(byUrl) {
 function enrichRows(rows, t) {
   return rows.map(r => ({
     ...r,
+    name: r.name || state.statsMap[r.symbol]?.name || '',
     pct: r[t.pctField] != null ? r[t.pctField] : null,
     ytdPct: state.statsMap[r.symbol]?.ytdPct ?? null,
     highPct: state.statsMap[r.symbol]?.highPct ?? null,
@@ -1783,7 +1797,7 @@ function buildSpecialTabData() {
 
   // Performance
   state.data['performance'] = stats.map(s => ({
-    symbol: s.symbol, close: s.close ?? null,
+    symbol: s.symbol, name: s.name || '', close: s.close ?? null,
     ytdPct: s.ytdPct ?? null, highPct: s.highPct ?? null,
     lowPct: s.lowPct ?? null,
     rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
@@ -1794,7 +1808,7 @@ function buildSpecialTabData() {
   state.data['priceBreaks'] = stats
     .filter(s => s.breakoutPct != null || s.breakdownPct != null)
     .map(s => ({
-      symbol: s.symbol, close: s.close ?? null,
+      symbol: s.symbol, name: s.name || '', close: s.close ?? null,
       breakoutPrice: s.breakoutPrice ?? null, breakoutDate: s.breakoutDate ?? null, breakoutPct: s.breakoutPct ?? null,
       breakdownPrice: s.breakdownPrice ?? null, breakdownDate: s.breakdownDate ?? null, breakdownPct: s.breakdownPct ?? null,
       rsi: s.rsi ?? null,
@@ -1822,12 +1836,12 @@ function _buildQuarterlyData(stats, field, tabId) {
   const qKeys = sortQuarterKeys(qKeySet);
 
   state.data[tabId] = filtered.map(s => {
-    const row = { symbol: s.symbol, close: s.close ?? null, highPct: s.highPct ?? null };
+    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null };
     qKeys.forEach(k => { row[k] = s[field][k] ?? null; });
     return row;
   });
 
-  const cols = ['symbol', 'close', 'highPct', ...qKeys];
+  const cols = ['symbol', 'name', 'close', 'highPct', ...qKeys];
   SPECIAL_TAB_COLS[tabId] = cols;
   qKeys.forEach(k => {
     COL_LABELS[k] = COL_LABELS[k] || k;
@@ -1843,12 +1857,12 @@ function _buildForwardPEData(stats) {
   const qKeys = sortQuarterKeys(qKeySet);
 
   state.data['fwdPE'] = filtered.map(s => {
-    const row = { symbol: s.symbol, close: s.close ?? null, forwardPE: s.forwardPE ?? null };
+    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, forwardPE: s.forwardPE ?? null };
     qKeys.forEach(k => { row[k] = s.forwardPEHistory[k] ?? null; });
     return row;
   });
 
-  const cols = ['symbol', 'close', 'forwardPE', ...qKeys];
+  const cols = ['symbol', 'name', 'close', 'forwardPE', ...qKeys];
   SPECIAL_TAB_COLS['fwdPE'] = cols;
   qKeys.forEach((k, i) => {
     COL_LABELS[k] = COL_LABELS[k] || k;
@@ -1876,7 +1890,7 @@ function _buildVixSpikeData(stats) {
   spikeDates.sort((a, b) => parseMDYY(b) - parseMDYY(a));
 
   state.data['vixSpikes'] = filtered.map(s => {
-    const row = { symbol: s.symbol, close: s.close ?? null, highPct: s.highPct ?? null };
+    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null };
     const gainByDate = {};
     s.vixReturns.forEach(ret => { gainByDate[ret.dateString] = ret.pctGain; });
     spikeDates.forEach(dateStr => { row['spike_' + dateStr] = gainByDate[dateStr] ?? null; });
@@ -1884,7 +1898,7 @@ function _buildVixSpikeData(stats) {
   });
 
   const spikeCols = spikeDates.map(dateStr => 'spike_' + dateStr);
-  const cols = ['symbol', 'close', 'highPct', ...spikeCols];
+  const cols = ['symbol', 'name', 'close', 'highPct', ...spikeCols];
   SPECIAL_TAB_COLS['vixSpikes'] = cols;
   spikeCols.forEach((spikeCol, idx) => {
     const dateStr = spikeDates[idx];

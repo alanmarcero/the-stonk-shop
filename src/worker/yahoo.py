@@ -9,23 +9,23 @@ USER_AGENT = "Mozilla/5.0"
 TIMEOUT_SECONDS = 10
 
 
-def fetch_daily_candles(symbol: str) -> Optional[tuple[list[float], list[int]]]:
+def fetch_daily_candles(symbol: str) -> Optional[tuple[list[float], list[int], str]]:
     return _fetch_candles(symbol, range_param="1mo", interval="1d")
 
 
-def fetch_monthly_candles(symbol: str) -> Optional[tuple[list[float], list[int]]]:
+def fetch_monthly_candles(symbol: str) -> Optional[tuple[list[float], list[int], str]]:
     return _fetch_candles(symbol, range_param="2y", interval="1wk")
 
 
-def fetch_quarterly_candles(symbol: str) -> Optional[tuple[list[float], list[int]]]:
+def fetch_quarterly_candles(symbol: str) -> Optional[tuple[list[float], list[int], str]]:
     return _fetch_candles(symbol, range_param="5y", interval="1wk")
 
 
-def fetch_stats_candles(symbol: str) -> Optional[tuple[list[float], list[int]]]:
+def fetch_stats_candles(symbol: str) -> Optional[tuple[list[float], list[int], str]]:
     return _fetch_candles(symbol, range_param="3y", interval="1d")
 
 
-def _fetch_candles(symbol: str, range_param: str, interval: str) -> Optional[tuple[list[float], list[int]]]:
+def _fetch_candles(symbol: str, range_param: str, interval: str) -> Optional[tuple[list[float], list[int], str]]:
     url = f"{BASE_URL}/{symbol}?range={range_param}&interval={interval}"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 
@@ -39,7 +39,7 @@ def _fetch_candles(symbol: str, range_param: str, interval: str) -> Optional[tup
     return _parse_response(response_data)
 
 
-def fetch_vix_candles() -> Optional[tuple[list[float], list[int]]]:
+def fetch_vix_candles() -> Optional[tuple[list[float], list[int], str]]:
     return _fetch_candles("^VIX", range_param="3y", interval="1d")
 
 
@@ -115,10 +115,12 @@ def _parse_forward_pe_history(response_data: dict) -> Optional[dict]:
     return None
 
 
-def _parse_response(response_data: dict) -> Optional[tuple[list[float], list[int]]]:
-    """Parse Yahoo chart API response into (closes, timestamps) or None."""
+def _parse_response(response_data: dict) -> Optional[tuple[list[float], list[int], str]]:
+    """Parse Yahoo chart API response into (closes, timestamps, short_name) or None."""
     try:
         chart_result = response_data["chart"]["result"][0]
+        meta = chart_result.get("meta", {})
+        short_name = meta.get("shortName") or meta.get("longName") or ""
         raw_timestamps = chart_result["timestamp"]
         raw_closes = chart_result["indicators"]["quote"][0]["close"]
     except (KeyError, IndexError, TypeError):
@@ -136,4 +138,4 @@ def _parse_response(response_data: dict) -> Optional[tuple[list[float], list[int
     closes = [close for close, _ in valid_closes]
     timestamps = [ts for _, ts in valid_closes]
 
-    return closes, timestamps
+    return closes, timestamps, short_name
