@@ -13,11 +13,13 @@ data "archive_file" "worker" {
 resource "aws_cloudwatch_log_group" "orchestrator" {
   name              = "/aws/lambda/${aws_lambda_function.orchestrator.function_name}"
   retention_in_days = 14
+  tags              = {} # Override default provider tags
 }
 
 resource "aws_cloudwatch_log_group" "worker" {
   name              = "/aws/lambda/${aws_lambda_function.worker.function_name}"
   retention_in_days = 14
+  tags              = {} # Override default provider tags
 }
 
 resource "aws_lambda_function" "orchestrator" {
