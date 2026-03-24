@@ -47,28 +47,32 @@ class TestLambdaHandler:
         )
 
     def test_sends_correct_batch_count(self):
-        symbols = [f"SYM{i}" for i in range(120)]
+        symbols = [f"SYM{i}" for i in range(120)] # 120 / 25 = 5 batches
         self.mock_s3.get_object.return_value = self._make_s3_response(symbols)
 
         lambda_handler({}, None)
 
-        assert self.mock_sqs.send_message.call_count == 5
+        # 5 batches sent in 1 SQS batch call (max 10 per call)
+        assert self.mock_sqs.send_message_batch.call_count == 1
+        assert len(self.mock_sqs.send_message_batch.call_args[1]["Entries"]) == 5
 
     def test_batch_message_structure(self):
-        symbols = [f"SYM{i}" for i in range(60)]
+        symbols = [f"SYM{i}" for i in range(60)] # 3 batches
         self.mock_s3.get_object.return_value = self._make_s3_response(symbols)
 
         lambda_handler({}, None)
 
-        first_call = self.mock_sqs.send_message.call_args_list[0]
-        body = json.loads(first_call[1]["MessageBody"])
+        first_sqs_batch = self.mock_sqs.send_message_batch.call_args_list[0]
+        entries = first_sqs_batch[1]["Entries"]
+        assert len(entries) == 3
+        
+        body = json.loads(entries[0]["MessageBody"])
         assert body["batchIndex"] == 0
         assert body["totalBatches"] == 3
         assert len(body["symbols"]) == 25
         assert "runId" in body
 
-        second_call = self.mock_sqs.send_message.call_args_list[1]
-        body2 = json.loads(second_call[1]["MessageBody"])
+        body2 = json.loads(entries[1]["MessageBody"])
         assert body2["batchIndex"] == 1
         assert body2["totalBatches"] == 3
         assert len(body2["symbols"]) == 25
@@ -78,7 +82,7 @@ class TestLambdaHandler:
 
         lambda_handler({}, None)
 
-        assert self.mock_sqs.send_message.call_args[1]["QueueUrl"] == "https://sqs.test/queue"
+        assert self.mock_sqs.send_message_batch.call_args[1]["QueueUrl"] == "https://sqs.test/queue"
 
     def test_returns_summary(self):
         self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL", "MSFT", "GOOG"])
@@ -97,7 +101,8 @@ class TestLambdaHandler:
         result = lambda_handler({}, None)
 
         assert json.loads(result["body"])["totalSymbols"] == 3
-        body_sent = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
+        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        body_sent = json.loads(entries[0]["MessageBody"])
         assert body_sent["symbols"] == ["AAPL", "MSFT", "GOOG"]
 
     def test_run_id_is_date_format(self):
@@ -115,7 +120,7 @@ class TestLambdaHandler:
         result = lambda_handler({}, None)
 
         assert json.loads(result["body"])["totalBatches"] == 1
-        assert self.mock_sqs.send_message.call_count == 1
+        assert self.mock_sqs.send_message_batch.call_count == 1
 
     def test_single_symbol(self):
         self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
@@ -123,7 +128,8 @@ class TestLambdaHandler:
         result = lambda_handler({}, None)
 
         assert json.loads(result["body"])["totalBatches"] == 1
-        body_sent = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
+        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        body_sent = json.loads(entries[0]["MessageBody"])
         assert body_sent["symbols"] == ["AAPL"]
         assert body_sent["totalBatches"] == 1
 
@@ -132,7 +138,8 @@ class TestLambdaHandler:
 
         lambda_handler({}, None)
 
-        body = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
+        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        body = json.loads(entries[0]["MessageBody"])
         assert "sneakPeek" not in body
 
     def test_includes_vix_spikes_in_message(self):
@@ -142,7 +149,8 @@ class TestLambdaHandler:
 
         lambda_handler({}, None)
 
-        body = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
+        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        body = json.loads(entries[0]["MessageBody"])
         assert body["vixSpikes"] == spikes
 
     def test_empty_vix_spikes_in_message(self):
@@ -151,7 +159,8 @@ class TestLambdaHandler:
 
         lambda_handler({}, None)
 
-        body = json.loads(self.mock_sqs.send_message.call_args[1]["MessageBody"])
+        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        body = json.loads(entries[0]["MessageBody"])
         assert body["vixSpikes"] == []
 
     def test_return_includes_vix_spike_count(self):

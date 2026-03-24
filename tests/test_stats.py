@@ -345,3 +345,37 @@ class TestComputeReturnSince:
         timestamps = [_ts(2025, 1, 20), _ts(2025, 3, 1)]
         result = compute_return_since(closes, timestamps, 2025, 1, 20)
         assert result == 33.33
+
+
+class TestZeroDivisionDefensive:
+
+    def test_highest_close_zero(self):
+        # Should not crash if high is 0
+        closes = [0.0, 0.0, 0.0]
+        pct, high = compute_highest_close_pct(closes)
+        assert high == 0.0
+        assert pct == 0.0
+
+    def test_lowest_close_zero(self):
+        # Should not crash if low is 0
+        closes = [0.0, 0.0, 0.0]
+        pct, low = compute_lowest_close_pct(closes)
+        assert low == 0.0
+        assert pct == 0.0
+
+    def test_sma200d_zero(self):
+        # Should not crash if sma200d is 0
+        closes = [0.0] * 250
+        timestamps = [_ts(2025, 1, 1) + i * 86400 for i in range(250)]
+        result = compute_stats(closes, timestamps)
+        assert result["sma200d"] == 0.0
+        assert result["pctSma200d"] == 0.0
+
+    def test_sma200w_zero(self):
+        # Should not crash if sma200w is 0
+        closes = [100.0, 110.0]
+        timestamps = [_ts(2025, 12, 31), _ts(2026, 1, 2)]
+        weekly_closes = [0.0] * 210
+        result = compute_stats(closes, timestamps, weekly_closes=weekly_closes)
+        assert result["sma200w"] == 0.0
+        assert result["pctSma200w"] == 0.0

@@ -27,15 +27,21 @@ def compute_quarterly_changes(
 
     for i, qe in enumerate(quarter_ends):
         label = qe["label"]
-        since_quarter[label] = round(
-            (current_close - qe["close"]) / qe["close"] * 100, 2
-        )
+        if qe["close"] > 0:
+            since_quarter[label] = round(
+                (current_close - qe["close"]) / qe["close"] * 100, 2
+            )
+        else:
+            since_quarter[label] = 0.0
 
         if i > 0:
             prev_close = quarter_ends[i - 1]["close"]
-            during_quarter[label] = round(
-                (qe["close"] - prev_close) / prev_close * 100, 2
-            )
+            if prev_close > 0:
+                during_quarter[label] = round(
+                    (qe["close"] - prev_close) / prev_close * 100, 2
+                )
+            else:
+                during_quarter[label] = 0.0
 
     return {"sinceQuarter": since_quarter, "duringQuarter": during_quarter}
 
