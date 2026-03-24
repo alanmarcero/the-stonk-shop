@@ -74,10 +74,6 @@ resource "aws_lambda_function_url" "orchestrator_url" {
   }
 }
 
-output "orchestrator_url" {
-  value = aws_lambda_function_url.orchestrator_url.function_url
-}
-
 resource "aws_lambda_event_source_mapping" "worker_sqs" {
   event_source_arn = aws_sqs_queue.batches.arn
   function_name    = aws_lambda_function.worker.arn
