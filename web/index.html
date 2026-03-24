@@ -1906,7 +1906,7 @@ async function fetchAll(isSilentRefresh = false) {
     if (isChecking) return;
     isChecking = true;
     try {
-      const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'GET' });
+      const res = await fetch('__ORCHESTRATOR_URL__?dev_key=__DEV_KEY__', { method: 'GET' });
       if (res.ok) {
         const data = await res.json();
         if (data.running) {
@@ -1935,7 +1935,7 @@ async function fetchAll(isSilentRefresh = false) {
       btn.disabled = true;
       btn.textContent = 'Starting...';
       try {
-        const res = await fetch('__ORCHESTRATOR_URL__?dev_key=stonks', { method: 'POST' });
+        const res = await fetch('__ORCHESTRATOR_URL__?dev_key=__DEV_KEY__', { method: 'POST' });
         if (res.status === 429 || res.ok) {
           btn.textContent = 'Scan in Progress';
           setTimeout(checkScanStatus, 5000); 

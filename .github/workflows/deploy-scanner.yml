@@ -30,6 +30,8 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_dev_key: ${{ secrets.DEV_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +72,9 @@ jobs:
           BUCKET=$(terraform output -raw bucket_name)
           DIST_ID=$(terraform output -raw cloudfront_distribution_id)
           ORCHESTRATOR_URL=$(terraform output -raw orchestrator_url || echo "")
+          DEV_KEY=$(terraform output -raw dev_key || echo "stonks")
           sed -i "s|__ORCHESTRATOR_URL__|${ORCHESTRATOR_URL}|g" ../web/index.html
+          sed -i "s|__DEV_KEY__|${DEV_KEY}|g" ../web/index.html
           aws s3 cp ../symbols/us-equities.txt "s3://${BUCKET}/symbols/us-equities.txt" --content-type "text/plain"
           aws s3 cp ../web/index.html "s3://${BUCKET}/app/index.html" --content-type "text/html" --cache-control "no-cache"
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"

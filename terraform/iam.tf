@@ -55,11 +55,10 @@ resource "aws_iam_role_policy" "orchestrator" {
       {
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "${aws_cloudwatch_log_group.orchestrator.arn}:*"
       }
     ]
   })
@@ -113,11 +112,10 @@ resource "aws_iam_role_policy" "worker" {
       {
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "${aws_cloudwatch_log_group.worker.arn}:*"
       }
     ]
   })

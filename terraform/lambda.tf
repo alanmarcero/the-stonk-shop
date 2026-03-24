@@ -10,6 +10,16 @@ data "archive_file" "worker" {
   output_path = "${path.module}/.build/worker.zip"
 }
 
+resource "aws_cloudwatch_log_group" "orchestrator" {
+  name              = "/aws/lambda/${aws_lambda_function.orchestrator.function_name}"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "worker" {
+  name              = "/aws/lambda/${aws_lambda_function.worker.function_name}"
+  retention_in_days = 14
+}
+
 resource "aws_lambda_function" "orchestrator" {
   function_name    = "ema-scanner-orchestrator"
   role             = aws_iam_role.orchestrator.arn
@@ -24,6 +34,7 @@ resource "aws_lambda_function" "orchestrator" {
     variables = {
       BUCKET_NAME = aws_s3_bucket.scanner.id
       QUEUE_URL   = aws_sqs_queue.batches.url
+      DEV_KEY     = var.dev_key
     }
   }
 }
@@ -55,7 +66,7 @@ resource "aws_lambda_function_url" "orchestrator_url" {
 
   cors {
     allow_credentials = true
-    allow_origins     = ["*"]
+    allow_origins     = ["https://${aws_cloudfront_distribution.results.domain_name}"]
     allow_methods     = ["POST", "GET"]
     allow_headers     = ["*"]
     expose_headers    = ["*"]

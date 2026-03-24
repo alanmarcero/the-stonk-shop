@@ -20,11 +20,14 @@ sqs = boto3.client("sqs")
 def lambda_handler(event: dict, context: Any) -> dict:
     bucket = os.environ["BUCKET_NAME"]
     queue_url = os.environ["QUEUE_URL"]
+    # Fallback to a hard-to-guess string if DEV_KEY is missing
+    dev_key = os.environ.get("DEV_KEY", "stonks-unconfigured-fallback")
 
     is_http = "requestContext" in event and "http" in event["requestContext"]
     if is_http:
         qs = event.get("queryStringParameters", {})
-        if qs.get("dev_key") != "stonks":
+        if qs.get("dev_key") != dev_key:
+            print(f"[orchestrator] Unauthorized HTTP access attempt")
             return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
 
     attrs = sqs.get_queue_attributes(
