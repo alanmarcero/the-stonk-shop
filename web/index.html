@@ -745,6 +745,70 @@
 
   .section-gap { margin-top: 20px; }
 
+  /* ── Mobile Bottom Sheet ── */
+  .sheet-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .sheet-overlay.open { display: block; opacity: 1; }
+
+  .sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 201;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    padding: 0 0 env(safe-area-inset-bottom, 16px);
+    transform: translateY(100%);
+    transition: transform 0.25s ease-out;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .sheet-overlay.open .sheet { transform: translateY(0); }
+
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--text-muted);
+    border-radius: 2px;
+    margin: 10px auto 6px;
+  }
+
+  .sheet-title {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 20px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sheet .tab {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .sheet .tab .count {
+    margin-left: auto;
+    font-size: 11px;
+  }
+
+  /* ── Mobile Source Drawer ── */
+  .source-drawer-toggle {
+    display: none;
+  }
+
   /* ── Responsive ── */
   @media (max-width: 640px) {
     /* 1. Compact banner */
@@ -758,7 +822,7 @@
     .banner .meta { font-size: 10px; }
     .meta-sep { margin: 0 4px; }
 
-    /* 2. Tab bar: horizontal scroll with fade hints */
+    /* 2. Tab bar: horizontal scroll, hide desktop dropdowns */
     .tabs {
       padding: 0 6px;
       -webkit-mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 20px), transparent);
@@ -769,45 +833,80 @@
     .tab { padding: 6px 10px; font-size: 11px; }
     .tab.standalone { padding: 8px 10px; min-height: 40px; }
     .tab .count { font-size: 9px; margin-left: 4px; padding: 1px 5px; }
+    /* Hide desktop fixed dropdowns on mobile — use bottom sheet instead */
+    .tab-dropdown { display: none !important; }
 
-    /* 3. Source toggles: fill width evenly */
-    .source-toggles { padding: 6px 6px; gap: 4px; }
+    /* 3. Source toggles: hidden by default, shown via drawer toggle */
+    .source-toggles {
+      display: none;
+      padding: 6px 6px;
+      gap: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .source-toggles.drawer-open { display: flex; }
     .source-group { display: flex; gap: 4px; flex-wrap: wrap; width: 100%; }
-    .source-btn { padding: 4px 8px; font-size: 10px; min-height: 32px; flex: 1 1 auto; text-align: center; }
+    .source-btn { padding: 5px 0; font-size: 10.5px; min-height: 32px; flex: 1 1 auto; text-align: center; }
+    .source-drawer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: var(--bg-surface);
+      border: none;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      transition: color 0.2s;
+    }
+    .source-drawer-toggle:hover { color: var(--text-primary); }
+    .source-drawer-toggle .chevron {
+      transition: transform 0.2s;
+      font-size: 9px;
+    }
+    .source-drawer-toggle.open .chevron { transform: rotate(180deg); }
+    .source-drawer-toggle .active-label {
+      color: var(--accent);
+      margin-left: auto;
+      font-family: var(--font-data);
+      font-size: 10px;
+    }
 
-    /* 4. Sticky toolbar */
+    /* 4. Toolbar: horizontal scroll, no wrap */
     .toolbar {
       padding: 6px 8px 4px;
       gap: 4px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      background: var(--bg-base);
-      border-bottom: 1px solid var(--border-subtle);
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+      mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
     }
-
-    /* 5. Quick filters: horizontal scroll instead of wrapping */
     .toolbar .quick-btn, .toolbar .reset-btn {
-      font-size: 12px;
-      padding: 6px 14px;
-      min-height: 34px;
+      font-size: 11px;
+      padding: 5px 10px;
+      min-height: 30px;
       flex-shrink: 0;
       white-space: nowrap;
     }
+    .row-count { flex-shrink: 0; white-space: nowrap; }
     .quick-sep { display: none; }
 
-    /* 6. Content area: minimal padding */
-    .content { padding: 6px 2px 16px; }
+    /* 5. Content area: minimal padding */
+    .content { padding: 6px 0 16px; }
 
-    /* 7. Table: compact rows + wider symbol column */
+    /* 6. Table: compact rows */
     table { font-size: 11px; }
     th { padding: 6px 6px; font-size: 10px; }
     td { padding: 4px 6px; font-size: 11px; }
     td.symbol { max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
     .col-ema { display: none; }
 
-    /* 8. Filter row */
-    .filter-row td { padding: 3px 2px; position: static; }
+    /* 7. Filter row: fix sticky alignment */
+    .filter-row td { padding: 3px 2px; }
+    .filter-row td.col-symbol-filter { position: sticky; left: 0; z-index: 2; background: var(--bg-elevated); }
     .filter-row .num-filters { gap: 3px; }
     .filter-row .num-filters-stacked { flex-direction: column; gap: 3px; }
     .num-filter-group { height: 30px; }
@@ -815,10 +914,10 @@
     .filter-row input.filter-num { width: 38px; font-size: 10px; padding: 2px 2px; }
     .filter-row input.filter-symbol { font-size: 10px; min-height: 30px; }
 
-    /* 9. Table wrapper: edge-to-edge */
+    /* 8. Table wrapper: edge-to-edge */
     .table-wrap { border-radius: 0; border-left: none; border-right: none; }
 
-    /* 10. Stat cards: responsive grid */
+    /* 9. Stat cards: responsive grid */
     .stat-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
     .stat-card { padding: 14px 16px; }
     .stat-value { font-size: 20px; }
@@ -833,17 +932,15 @@
     .tab { padding: 5px 8px; font-size: 10px; }
     .tab.standalone { padding: 6px 8px; min-height: 36px; }
     .tab .count { font-size: 8px; padding: 1px 4px; }
-    .source-toggles { padding: 4px 4px; gap: 3px; }
-    .source-group { gap: 3px; }
-    .source-btn { padding: 3px 6px; font-size: 9.5px; min-height: 30px; }
+    .source-btn { padding: 4px 0; font-size: 9.5px; min-height: 30px; }
     .toolbar { padding: 4px 6px 3px; }
-    .toolbar .quick-btn, .toolbar .reset-btn { font-size: 11px; padding: 5px 12px; min-height: 32px; }
+    .toolbar .quick-btn, .toolbar .reset-btn { font-size: 10px; padding: 4px 8px; min-height: 28px; }
     .content { padding: 4px 0 12px; }
     table { font-size: 10px; }
     th { padding: 5px 4px; font-size: 9px; }
     td { padding: 3px 4px; }
     td.symbol { max-width: 72px; }
-    .filter-row td { padding: 2px 2px; position: static; }
+    .filter-row td { padding: 2px 2px; }
     .num-filter-group { height: 28px; }
     .spin-btn { width: 22px; font-size: 11px; }
     .filter-row input.filter-num { width: 36px; font-size: 9px; }
@@ -864,8 +961,19 @@
 </div>
 
 <div class="tabs" id="tabs"></div>
+<button class="source-drawer-toggle" id="source-drawer-toggle">
+  Filters <span class="chevron">&#9660;</span>
+  <span class="active-label" id="source-drawer-label"></span>
+</button>
 <div class="source-toggles" id="source-toggles"></div>
 <div class="source-toggles" id="week-selector" style="display:none"></div>
+<div class="sheet-overlay" id="tab-sheet-overlay">
+  <div class="sheet" id="tab-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="tab-sheet-title"></div>
+    <div id="tab-sheet-items"></div>
+  </div>
+</div>
 <div class="toolbar" id="toolbar"></div>
 <div class="content" id="content">
   <div class="loading">Loading scan data&hellip;</div>
@@ -1078,6 +1186,7 @@ function renderSourceToggles() {
       showTab(state.activeTab);
     })
   );
+  updateSourceDrawerLabel();
 }
 
 function matchesSources(symbol) {
@@ -1333,6 +1442,8 @@ function getTabCountCached(t) {
   return count;
 }
 
+const isMobile = () => window.innerWidth <= 640;
+
 function renderTabs() {
   const el = document.getElementById('tabs');
   let html = '';
@@ -1353,7 +1464,7 @@ function renderTabs() {
     const countText = activeInGroup ? getTabCountCached(activeInGroup) : '';
     const countSpan = countText ? `<span class="count">${countText}</span>` : '';
 
-    html += `<div class="tab-group">`;
+    html += `<div class="tab-group" data-group-label="${esc(group.label)}">`;
     html += `<button class="${btnCls}">${activeLabel}${countSpan}</button>`;
     html += `<div class="tab-dropdown">`;
     for (const t of groupTabDefs) {
@@ -1377,11 +1488,17 @@ function renderTabs() {
 
   el.innerHTML = html;
 
-  // Dropdown toggle
+  // Dropdown toggle — bottom sheet on mobile, position:fixed on desktop
   el.querySelectorAll('.tab-group-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const group = btn.parentElement;
+
+      if (isMobile()) {
+        openTabSheet(group);
+        return;
+      }
+
       const wasOpen = group.classList.contains('open');
       closeAllDropdowns();
       if (!wasOpen) {
@@ -1413,6 +1530,70 @@ function closeAllDropdowns() {
 
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.tab-group')) closeAllDropdowns();
+});
+
+/* ── Mobile Bottom Sheet for tab groups ── */
+
+function openTabSheet(groupEl) {
+  const overlay = document.getElementById('tab-sheet-overlay');
+  const title = document.getElementById('tab-sheet-title');
+  const items = document.getElementById('tab-sheet-items');
+  const label = groupEl.dataset.groupLabel || '';
+
+  title.textContent = label;
+
+  const groupTabDefs = [];
+  const groupDef = TAB_GROUPS.find(g => g.label === label);
+  if (!groupDef) return;
+
+  let html = '';
+  for (const id of groupDef.tabs) {
+    const t = TAB_DEFS.find(td => td.id === id);
+    if (!t) continue;
+    const isActive = t.id === state.activeTab;
+    const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
+    const tabCount = getTabCountCached(t);
+    const tabCountSpan = tabCount ? `<span class="count">${tabCount}</span>` : '';
+    html += `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${tabCountSpan}</div>`;
+  }
+
+  items.innerHTML = html;
+  overlay.classList.add('open');
+
+  items.querySelectorAll('.tab[data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      closeTabSheet();
+      switchToTab(tab.dataset.tab);
+    });
+  });
+}
+
+function closeTabSheet() {
+  document.getElementById('tab-sheet-overlay').classList.remove('open');
+}
+
+document.getElementById('tab-sheet-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeTabSheet();
+});
+
+/* ── Mobile Source Drawer ── */
+
+function updateSourceDrawerLabel() {
+  const label = document.getElementById('source-drawer-label');
+  if (!label) return;
+  if (state.activeSourceMode === 'all') label.textContent = 'All';
+  else if (state.activeSourceMode === 'none') label.textContent = 'None';
+  else if (state.activeSourceMode instanceof Set) {
+    label.textContent = [...state.activeSourceMode].map(id => SOURCE_DEFS[id]?.label || id).join(', ');
+  }
+}
+
+document.getElementById('source-drawer-toggle').addEventListener('click', () => {
+  const btn = document.getElementById('source-drawer-toggle');
+  const el = document.getElementById('source-toggles');
+  const isOpen = el.classList.contains('drawer-open');
+  el.classList.toggle('drawer-open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
 });
 
 /* ── Table building helpers ── */
