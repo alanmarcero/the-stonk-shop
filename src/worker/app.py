@@ -21,9 +21,7 @@ class BatchResult:
 
     crossovers: list[dict] = field(default_factory=list)
     crossdowns: list[dict] = field(default_factory=list)
-    day_below: list[dict] = field(default_factory=list)
     week_below: list[dict] = field(default_factory=list)
-    day_above: list[dict] = field(default_factory=list)
     week_above: list[dict] = field(default_factory=list)
     month_crossovers: list[dict] = field(default_factory=list)
     month_crossdowns: list[dict] = field(default_factory=list)
@@ -202,12 +200,6 @@ def _process_batch(
         elif daily_result:
             name = daily_result[2]
 
-        daily_above, daily_below = _process_daily(symbol, name, daily_result)
-        if daily_above is not None:
-            batch.day_above.append(daily_above)
-        if daily_below is not None:
-            batch.day_below.append(daily_below)
-
         weekly = _process_timeframe(
             symbol, name, weekly_result, "weeksBelow", "weeksAbove",
             min_below=MIN_WEEKS_THRESHOLD,
@@ -249,36 +241,6 @@ def _process_batch(
                 batch.stats_data.append(computed)
 
     return batch
-
-
-def _process_daily(
-    symbol: str,
-    name: str,
-    daily_result: Optional[tuple[list[float], list[int], str]],
-) -> tuple[Optional[dict], Optional[dict]]:
-    """Process daily candles for a symbol.
-
-    Returns (day_above_entry, day_below_entry), either may be None.
-    """
-    if daily_result is None:
-        return None, None
-    daily_closes = daily_result[0]
-    daily_ema_value = ema.calculate(daily_closes)
-    if daily_ema_value is None:
-        return None, None
-    last_close = daily_closes[-1]
-
-    above_entry = None
-    above_count = ema.count_periods_above(daily_closes)
-    if above_count is not None:
-        above_entry = _above_entry(symbol, name, last_close, daily_ema_value, above_count)
-
-    below_entry = None
-    below_count = ema.count_periods_below(daily_closes)
-    if below_count is not None:
-        below_entry = _below_entry(symbol, name, last_close, daily_ema_value, below_count)
-
-    return above_entry, below_entry
 
 
 def _process_timeframe(
@@ -344,9 +306,7 @@ def _write_batch_results(
         "errorDetails": batch.errors,
         "crossovers": batch.crossovers,
         "crossdowns": batch.crossdowns,
-        "dayBelow": batch.day_below,
         "weekBelow": batch.week_below,
-        "dayAbove": batch.day_above,
         "weekAbove": batch.week_above,
         "monthCrossovers": batch.month_crossovers,
         "monthCrossdowns": batch.month_crossdowns,
@@ -370,9 +330,7 @@ def _write_errors(bucket: str, run_id: str, batch_index: int, errors: list[dict]
 _AGGREGATE_KEYS = [
     ("crossovers", "weeksBelow"),
     ("crossdowns", "weeksAbove"),
-    ("dayBelow", "count"),
     ("weekBelow", "count"),
-    ("dayAbove", "count"),
     ("weekAbove", "count"),
     ("monthCrossovers", "monthsBelow"),
     ("monthCrossdowns", "monthsAbove"),
@@ -387,8 +345,8 @@ _AGGREGATE_KEYS = [
 _RESULT_FILES = [
     ("", {"crossovers"}),
     ("-crossdown", {"crossdowns"}),
-    ("-below", {"dayBelow", "weekBelow"}),
-    ("-above", {"dayAbove", "weekAbove"}),
+    ("-below", {"weekBelow"}),
+    ("-above", {"weekAbove"}),
     ("-monthly", {"monthCrossovers", "monthCrossdowns"}),
     ("-monthly-below-above", {"monthBelow", "monthAbove"}),
     ("-quarterly", {"quarterCrossovers", "quarterCrossdowns"}),

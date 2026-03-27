@@ -1034,8 +1034,6 @@ const TAB_DEFS = [
   { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
   { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
   { id: 'weekAbove',   label: 'Wk Above',       file: '/results/latest-above.json',                 key: 'weekAbove',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'dayBelow',    label: 'Day Below',      file: '/results/latest-below.json',                 key: 'dayBelow',        cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'dayAbove',    label: 'Day Above',      file: '/results/latest-above.json',                 key: 'dayAbove',        cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
   { id: 'moCrossUp',   label: 'Mo Cross Up',    file: '/results/latest-monthly.json',               key: 'monthCrossovers', cols: ['symbol','name','close','monthsBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctAbove' },
   { id: 'moCrossDown', label: 'Mo Cross Down',  file: '/results/latest-monthly.json',               key: 'monthCrossdowns', cols: ['symbol','name','close','monthsAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctBelow' },
   { id: 'moBelow',     label: 'Mo Below',       file: '/results/latest-monthly-below-above.json',   key: 'monthBelow',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
@@ -1071,11 +1069,10 @@ const CROSS_UP_TABS = new Set(['crossovers', 'moCrossUp', 'qCrossUp']);
 const CROSS_DOWN_TABS = new Set(['crossdowns', 'moCrossDown', 'qCrossDown']);
 
 const TAB_GROUPS = [
-  { label: 'Daily',     tabs: ['dayBelow', 'dayAbove'] },
   { label: 'Weekly',    tabs: ['crossovers', 'crossdowns', 'weekBelow', 'weekAbove'] },
   { label: 'Monthly',   tabs: ['moCrossUp', 'moCrossDown', 'moBelow', 'moAbove'] },
-  { label: 'Quarterly', tabs: ['qCrossUp', 'qCrossDown', 'qBelow', 'qAbove', 'sinceQ', 'duringQ'] },
-  { label: 'Performance', tabs: ['performance', 'priceBreaks', 'fwdPE', 'vixSpikes'] },
+  { label: 'Quarterly', tabs: ['qCrossUp', 'qCrossDown', 'qBelow', 'qAbove'] },
+  { label: 'Performance', tabs: ['performance', 'priceBreaks', 'sinceQ', 'duringQ', 'fwdPE', 'vixSpikes'] },
 ];
 
 const GROUPED_TAB_IDS = new Set(TAB_GROUPS.flatMap(g => g.tabs));
