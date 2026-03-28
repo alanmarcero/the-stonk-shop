@@ -40,6 +40,7 @@ cloudfront = boto3.client("cloudfront")
 RATE_LIMIT_DELAY = 1
 MIN_WEEKS_THRESHOLD = 3
 MAX_WEEKLY_SNAPSHOTS = 6
+_5Y_RETURN_SYMBOLS = {"SPY", "QQQ", "DIA", "IWM", "TMUS"}
 
 
 def lambda_handler(event: dict, context: Any) -> dict:
@@ -238,6 +239,12 @@ def _process_batch(
                     inauguration = stats.compute_return_since(closes, timestamps, 2025, 1, 20)
                     if inauguration is not None:
                         computed["spxSinceInauguration"] = inauguration
+                if symbol in _5Y_RETURN_SYMBOLS and weekly_result is not None:
+                    ret = stats.compute_return_since(
+                        weekly_result[0], weekly_result[1], 2021, 3, 28,
+                    )
+                    if ret is not None:
+                        computed["return5Y"] = ret
                 batch.stats_data.append(computed)
 
     return batch
@@ -498,6 +505,12 @@ def _compute_misc_stats(
             misc["spxSinceElection"] = voo["spxSinceElection"]
         if "spxSinceInauguration" in voo:
             misc["spxSinceInauguration"] = voo["spxSinceInauguration"]
+
+    # 5-year returns for key symbols
+    for sym in ("SPY", "QQQ", "DIA", "IWM", "TMUS"):
+        entry = next((s for s in all_stats if s.get("symbol") == sym), None)
+        if entry and "return5Y" in entry:
+            misc[f"{sym.lower()}5Y"] = entry["return5Y"]
 
     return misc
 
