@@ -363,6 +363,33 @@ class TestProcessBatch:
         assert result.stats_data[0]["spxSinceInauguration"] == -3.0
         assert self.mock_stats.compute_return_since.call_count == 2
 
+    def test_5y_return_computed_for_spy(self):
+        weekly_data = ([50.0] * 10, list(range(10)), "SPY")
+        self.mock_yahoo.fetch_quarterly_candles.return_value = weekly_data
+        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "SPY")
+        self.mock_yahoo.fetch_forward_pe.return_value = (None, None)
+        self.mock_stats.compute_stats.return_value = {"close": 105.0}
+        self.mock_stats.compute_return_since.return_value = 85.5
+
+        result = _process_batch(["SPY"])
+
+        assert len(result.stats_data) == 1
+        assert result.stats_data[0]["return5Y"] == 85.5
+        self.mock_stats.compute_return_since.assert_called_once_with(
+            weekly_data[0], weekly_data[1], 2021, 3, 28,
+        )
+
+    def test_5y_return_not_computed_for_non_target_symbol(self):
+        self.mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "AAPL")
+        self.mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "AAPL")
+        self.mock_yahoo.fetch_forward_pe.return_value = (None, None)
+        self.mock_stats.compute_stats.return_value = {"close": 105.0}
+
+        result = _process_batch(["AAPL"])
+
+        assert "return5Y" not in result.stats_data[0]
+        self.mock_stats.compute_return_since.assert_not_called()
+
 
 class TestStripIncompleteWeek:
 
@@ -1457,6 +1484,27 @@ class TestComputeMiscStats:
         result = _compute_misc_stats(stats)
         assert "spxSinceElection" not in result
         assert "spxSinceInauguration" not in result
+
+    def test_5y_returns_extracted(self):
+        stats = [
+            {"symbol": "SPY", "ytdPct": 5.0, "return5Y": 85.5},
+            {"symbol": "QQQ", "ytdPct": 8.0, "return5Y": 120.3},
+            {"symbol": "DIA", "ytdPct": 3.0, "return5Y": 55.0},
+            {"symbol": "IWM", "ytdPct": -2.0, "return5Y": 30.1},
+            {"symbol": "TMUS", "ytdPct": 10.0, "return5Y": 150.0},
+        ]
+        result = _compute_misc_stats(stats)
+        assert result["spy5Y"] == 85.5
+        assert result["qqq5Y"] == 120.3
+        assert result["dia5Y"] == 55.0
+        assert result["iwm5Y"] == 30.1
+        assert result["tmus5Y"] == 150.0
+
+    def test_5y_returns_absent_without_symbols(self):
+        stats = [{"symbol": "AAPL", "ytdPct": 5.0}]
+        result = _compute_misc_stats(stats)
+        assert "spy5Y" not in result
+        assert "qqq5Y" not in result
 
     def test_forward_pe_median_odd_count(self):
         stats = [

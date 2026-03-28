@@ -1953,6 +1953,11 @@ function showMiscStats() {
     { label: 'Above 200W SMA', value: misc.pctAbove200wSMA != null ? misc.pctAbove200wSMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove200wSMA != null ? 'var(--green)' : null },
     { label: 'SPX Since Election', value: misc.spxSinceElection != null ? (misc.spxSinceElection > 0 ? '+' : '') + misc.spxSinceElection.toFixed(2) + '%' : '\u2014', color: misc.spxSinceElection != null ? (misc.spxSinceElection >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'SPX Since Inauguration', value: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration > 0 ? '+' : '') + misc.spxSinceInauguration.toFixed(2) + '%' : '\u2014', color: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'SPY 5Y', value: misc.spy5Y != null ? (misc.spy5Y > 0 ? '+' : '') + misc.spy5Y.toFixed(2) + '%' : '\u2014', color: misc.spy5Y != null ? (misc.spy5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'QQQ 5Y', value: misc.qqq5Y != null ? (misc.qqq5Y > 0 ? '+' : '') + misc.qqq5Y.toFixed(2) + '%' : '\u2014', color: misc.qqq5Y != null ? (misc.qqq5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'DIA 5Y', value: misc.dia5Y != null ? (misc.dia5Y > 0 ? '+' : '') + misc.dia5Y.toFixed(2) + '%' : '\u2014', color: misc.dia5Y != null ? (misc.dia5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'IWM 5Y', value: misc.iwm5Y != null ? (misc.iwm5Y > 0 ? '+' : '') + misc.iwm5Y.toFixed(2) + '%' : '\u2014', color: misc.iwm5Y != null ? (misc.iwm5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'TMUS 5Y', value: misc.tmus5Y != null ? (misc.tmus5Y > 0 ? '+' : '') + misc.tmus5Y.toFixed(2) + '%' : '\u2014', color: misc.tmus5Y != null ? (misc.tmus5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
   ];
 
   document.getElementById('content').innerHTML = `<div class="stat-grid">` +
