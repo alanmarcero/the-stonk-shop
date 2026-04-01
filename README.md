@@ -20,7 +20,7 @@ EventBridge (Scheduler) → Orchestrator Lambda → SQS → Worker Lambda → S3
 - **VIX Spike Correlation** — Returns since major market volatility events.
 - **Swing Levels** — Breakout/breakdown price levels with historical date tracking.
 - **Interactive Dashboard** — Responsive web UI with real-time scan status, sorting, and multi-source filtering.
-- **On-Demand Scans** — Secure "Run Now" trigger protected by a `DEV_KEY` and origin-restricted CORS.
+- **On-Demand Scans** — Secure "Run Now" trigger protected by origin-restricted CORS.
 
 ## Project Structure
 
@@ -50,7 +50,7 @@ aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 **GitHub Actions:** Automatically triggered on push to `main`.
 1.  **Test:** Executes 340 unit tests via `pytest`.
 2.  **Infrastructure:** Applies Terraform changes (IAM, Lambda, SQS, S3).
-3.  **App:** Injects `ORCHESTRATOR_URL` and `DEV_KEY` into `index.html` and deploys to S3.
+3.  **App:** Injects `ORCHESTRATOR_URL` into `index.html` and deploys to S3.
 4.  **CDN:** Invalidates CloudFront cache for instant updates.
 
 ## License
