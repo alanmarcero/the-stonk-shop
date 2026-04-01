@@ -155,6 +155,19 @@ class TestProcessBatch:
         assert len(result.crossdowns) == 1
         assert result.crossdowns[0]["weeksAbove"] == 4
 
+    def test_spy_includes_chatgpt_returns(self, mock_worker_deps):
+        mock_yahoo, _, mock_stats = mock_worker_deps
+        mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "SPY")
+        mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "SPY")
+        mock_stats.compute_stats.return_value = {"close": 105.0}
+        # First call for ChatGPT (daily), second for 5Y (weekly)
+        mock_stats.compute_return_since.side_effect = [45.0, 85.5]
+
+        result = _process_batch(["SPY"])
+
+        assert result.stats_data[0]["spySinceChatGPT"] == 45.0
+        assert result.stats_data[0]["return5Y"] == 85.5
+
 
 class TestStripIncompleteWeek:
     def test_strips_current_week_candle(self):
@@ -343,6 +356,14 @@ class TestComputeMiscStats:
         stats = [{"highPct": -3.0}, {"highPct": -10.0}, {"highPct": 0.0}]
         result = _compute_misc_stats(stats)
         assert result["pctWithin5OfHigh"] == 66.7
+
+    def test_spy_since_chatgpt_extracted(self):
+        stats = [
+            {"symbol": "AAPL", "ytdPct": 5.0},
+            {"symbol": "SPY", "ytdPct": 8.0, "spySinceChatGPT": 45.67},
+        ]
+        result = _compute_misc_stats(stats)
+        assert result["spySinceChatGPT"] == 45.67
 
 
 class TestAggregateResultsStats:

@@ -182,6 +182,10 @@ def _add_special_stats(symbol: str, computed: dict, daily_result: tuple, weekly_
         inauguration = stats.compute_return_since(daily_result[0], daily_result[1], 2025, 1, 20)
         if inauguration is not None: computed["spxSinceInauguration"] = inauguration
 
+    if symbol == "SPY":
+        chatgpt = stats.compute_return_since(daily_result[0], daily_result[1], 2022, 11, 30)
+        if chatgpt is not None: computed["spySinceChatGPT"] = chatgpt
+
     if symbol in _5Y_RETURN_SYMBOLS and weekly_result is not None:
         ret = stats.compute_return_since(weekly_result[0], weekly_result[1], 2021, 3, 28)
         if ret is not None: computed["return5Y"] = ret
@@ -339,6 +343,10 @@ def _compute_misc_stats(all_stats: list[dict], week_above_count: int = 0, total_
     if voo:
         for k in ("spxSinceElection", "spxSinceInauguration"):
             if k in voo: misc[k] = voo[k]
+
+    spy = next((s for s in all_stats if s.get("symbol") == "SPY"), None)
+    if spy and "spySinceChatGPT" in spy:
+        misc["spySinceChatGPT"] = spy["spySinceChatGPT"]
 
     for sym in ("SPY", "QQQ", "DIA", "IWM", "TMUS"):
         entry = next((s for s in all_stats if s.get("symbol") == sym), None)
