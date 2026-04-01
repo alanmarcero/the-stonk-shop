@@ -8,7 +8,7 @@ from src.worker.app import (
     _process_batch,
     _aggregate_to_monthly,
     _aggregate_to_quarterly,
-    _strip_incomplete_week,
+    _ensure_one_candle_per_week,
     _update_manifest,
     _delete_snapshot,
     _compute_misc_stats,
@@ -27,7 +27,8 @@ EMPTY_BATCH = {"symbolsProcessed": 10, "errors": 0, "errorDetails": [], "crossov
 
 
 def _timestamps_for(closes):
-    return list(range(len(closes)))
+    # One week = 604800 seconds
+    return [1708560000 + i * 604800 for i in range(len(closes))]
 
 
 @pytest.fixture(autouse=True)
@@ -169,23 +170,10 @@ class TestProcessBatch:
         assert result.stats_data[0]["return5Y"] == 85.5
 
 
-class TestStripIncompleteWeek:
-    def test_strips_current_week_candle(self):
+class TestEnsureOneCandlePerWeek:
+    def test_deduplicates_multiple_candles_in_same_week(self):
         from datetime import datetime, timezone, timedelta
         now = datetime.now(timezone.utc)
-        current_monday = now - timedelta(days=now.weekday())
-        current_ts = int(current_monday.replace(hour=0, minute=0, second=0).timestamp())
-        last_monday_ts = int((current_monday - timedelta(weeks=1)).replace(hour=0, minute=0, second=0).timestamp())
-        closes = [100.0, 101.0, 102.0]
-        timestamps = [last_monday_ts - 604800, last_monday_ts, current_ts]
-        result_closes, result_ts = _strip_incomplete_week(closes, timestamps)
-        assert len(result_closes) == 2
-        assert result_closes[-1] == 101.0
-
-    def test_strips_multiple_candles_from_current_week(self):
-        from datetime import datetime, timezone, timedelta
-        now = datetime.now(timezone.utc)
-        # Ensure we have at least 2 different timestamps in the current ISO week
         monday = now - timedelta(days=now.weekday())
         ts1 = int(monday.replace(hour=10).timestamp())
         ts2 = int(monday.replace(hour=15).timestamp())
@@ -195,21 +183,30 @@ class TestStripIncompleteWeek:
         closes = [100.0, 101.0, 102.0]
         timestamps = [last_week_ts, ts1, ts2]
         
-        result_closes, result_ts = _strip_incomplete_week(closes, timestamps)
+        result_closes, result_ts = _ensure_one_candle_per_week(closes, timestamps)
         
-        assert len(result_closes) == 1
+        assert len(result_closes) == 2
         assert result_closes[0] == 100.0
+        assert result_closes[1] == 102.0  # Keep the latest one
 
-    def test_keeps_complete_week_candle(self):
+    def test_preserves_order(self):
         from datetime import datetime, timezone, timedelta
         now = datetime.now(timezone.utc)
-        last_monday = now - timedelta(days=now.weekday()) - timedelta(weeks=1)
-        last_ts = int(last_monday.replace(hour=0, minute=0, second=0).timestamp())
-        prev_ts = last_ts - 604800
-        closes = [100.0, 101.0]
-        timestamps = [prev_ts, last_ts]
-        result_closes, _ = _strip_incomplete_week(closes, timestamps)
-        assert len(result_closes) == 2
+        w1 = int((now - timedelta(weeks=2)).timestamp())
+        w2 = int((now - timedelta(weeks=1)).timestamp())
+        w3 = int(now.timestamp())
+        
+        closes = [10.0, 20.0, 30.0]
+        timestamps = [w1, w2, w3]
+        
+        result_closes, result_ts = _ensure_one_candle_per_week(closes, timestamps)
+        assert result_closes == [10.0, 20.0, 30.0]
+        assert result_ts == [w1, w2, w3]
+
+    def test_empty_input(self):
+        closes, timestamps = _ensure_one_candle_per_week([], [])
+        assert closes == []
+        assert timestamps == []
 
 
 class TestAggregateToMonthly:
