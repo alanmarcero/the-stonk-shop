@@ -65,20 +65,20 @@ def lambda_handler(event: dict, context: Any) -> dict:
     return {"statusCode": 200}
 
 
-def _strip_incomplete_week(closes: list[float], timestamps: list[int]) -> tuple[list[float], list[int]]:
-    """Drop all candles belonging to the current (incomplete) ISO week."""
+def _ensure_one_candle_per_week(closes: list[float], timestamps: list[int]) -> tuple[list[float], list[int]]:
+    """Group candles by ISO week and keep only the latest one per week."""
     if not timestamps:
         return closes, timestamps
     
-    now_iso = datetime.now(timezone.utc).isocalendar()
+    # Use dict to keep only the last candle seen for each (year, week)
+    weeks: dict[tuple[int, int], tuple[float, int]] = {}
+    for c, t in zip(closes, timestamps):
+        iso = datetime.fromtimestamp(t, tz=timezone.utc).isocalendar()
+        weeks[(iso[0], iso[1])] = (c, t)
     
-    # Filter for candles NOT in the current week
-    valid_indices = [
-        i for i, ts in enumerate(timestamps)
-        if datetime.fromtimestamp(ts, tz=timezone.utc).isocalendar()[:2] != (now_iso[0], now_iso[1])
-    ]
-    
-    return [closes[i] for i in valid_indices], [timestamps[i] for i in valid_indices]
+    # Sort by timestamp to preserve chronological order
+    sorted_items = sorted(weeks.values(), key=lambda x: x[1])
+    return [x[0] for x in sorted_items], [x[1] for x in sorted_items]
 
 
 def _aggregate_to_monthly(closes: list[float], timestamps: list[int]) -> list[float]:
@@ -205,7 +205,11 @@ def _process_timeframe(
     if candle_result is None:
         return empty
 
-    closes, timestamps = _strip_incomplete_week(candle_result[0], candle_result[1])
+    # Ensure we have exactly one candle per period (week/month/quarter)
+    # 1. Start with raw weekly candles and deduplicate by week
+    closes, timestamps = _ensure_one_candle_per_week(candle_result[0], candle_result[1])
+    
+    # 2. If aggregating further (monthly/quarterly), exclude the current in-progress period
     if aggregate_fn is not None:
         closes = aggregate_fn(closes, timestamps)
 
