@@ -66,14 +66,19 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
 
 def _strip_incomplete_week(closes: list[float], timestamps: list[int]) -> tuple[list[float], list[int]]:
-    """Drop the last candle if it belongs to the current (incomplete) week."""
+    """Drop all candles belonging to the current (incomplete) ISO week."""
     if not timestamps:
         return closes, timestamps
-    now = datetime.now(timezone.utc)
-    last_dt = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc)
-    if last_dt.isocalendar()[1] == now.isocalendar()[1] and last_dt.year == now.year:
-        return closes[:-1], timestamps[:-1]
-    return closes, timestamps
+    
+    now_iso = datetime.now(timezone.utc).isocalendar()
+    
+    # Filter for candles NOT in the current week
+    valid_indices = [
+        i for i, ts in enumerate(timestamps)
+        if datetime.fromtimestamp(ts, tz=timezone.utc).isocalendar()[:2] != (now_iso[0], now_iso[1])
+    ]
+    
+    return [closes[i] for i in valid_indices], [timestamps[i] for i in valid_indices]
 
 
 def _aggregate_to_monthly(closes: list[float], timestamps: list[int]) -> list[float]:
