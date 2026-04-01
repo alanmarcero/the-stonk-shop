@@ -209,6 +209,52 @@ class TestAggregateToMonthly:
         assert len(result) == 2
         assert result == [102.0, 201.0]
 
+    def test_strips_current_month(self):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        # Entry from current month
+        ts_current = int(now.replace(day=1).timestamp())
+        # Entry from last month
+        ts_last = ts_current - 86400 * 5
+        
+        closes = [100.0, 110.0]
+        timestamps = [ts_last, ts_current]
+        
+        result = _aggregate_to_monthly(closes, timestamps)
+        
+        assert len(result) == 1
+        assert result[0] == 100.0
+
+
+class TestAggregateToQuarterly:
+    def test_groups_by_calendar_quarter(self):
+        from datetime import datetime, timezone
+        # Q1 2025
+        ts_q1 = int(datetime(2025, 2, 10, tzinfo=timezone.utc).timestamp())
+        # Q2 2025
+        ts_q2 = int(datetime(2025, 5, 10, tzinfo=timezone.utc).timestamp())
+        
+        closes = [100.0, 200.0]
+        result = _aggregate_to_quarterly(closes, [ts_q1, ts_q2])
+        assert len(result) == 2
+        assert result == [100.0, 200.0]
+
+    def test_strips_current_quarter(self):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        # Entry from current month (definitely current quarter)
+        ts_current = int(now.timestamp())
+        # Entry from 4 months ago (definitely previous quarter)
+        ts_prev = ts_current - 86400 * 120
+        
+        closes = [100.0, 200.0]
+        timestamps = [ts_prev, ts_current]
+        
+        result = _aggregate_to_quarterly(closes, timestamps)
+        
+        assert len(result) == 1
+        assert result[0] == 100.0
+
 
 @pytest.fixture
 def mock_handler_deps():
