@@ -45,8 +45,6 @@ python3 -m pytest tests/ -v
 aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 ```
 
-**AWS CLI:** Profile `scanner` configured locally for the `alanmarcero` IAM user.
-
 ## Deployment
 
 **GitHub Actions:** Automatically triggered on push to `main`.
@@ -54,14 +52,6 @@ aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 2.  **Infrastructure:** Applies Terraform changes (IAM, Lambda, SQS, S3).
 3.  **App:** Injects `ORCHESTRATOR_URL` and `DEV_KEY` into `index.html` and deploys to S3.
 4.  **CDN:** Invalidates CloudFront cache for instant updates.
-
-**Required Secrets:**
-- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
-- `DEV_KEY` — Secure token for on-demand scan triggers.
-
-## Related Repos
-
-- **[StockTicker-macOS](https://github.com/alanmarcero/StockTicker-macOS)** — macOS menu bar app that consumes this scanner's CloudFront API via `ScannerService`.
 
 ## License
 
