@@ -5,21 +5,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-import boto3
-
 # Dual import supports both Lambda (package) and direct test execution contexts.
 try:
     from . import aggregator, ema, stats, storage, yahoo
 except ImportError:
     import aggregator, ema, stats, storage, yahoo
-
-# Define clients in app.py so tests can mock them
-s3 = boto3.client("s3")
-cloudfront = boto3.client("cloudfront")
-
-# Backward-compatibility for tests
-_read_json = storage.read_json
-_put_json = storage.put_json
 
 
 @dataclass
@@ -69,7 +59,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
         if _all_batches_complete(bucket, run_id, total_batches):
             print(f"[worker] All {total_batches} batches complete. Aggregating.")
-            _aggregate_results(bucket, run_id, total_batches, snapshot=snapshot)
+            _aggregate_and_finalize(bucket, run_id, total_batches, snapshot=snapshot)
             _invalidate_cache()
 
     return {"statusCode": 200}
@@ -244,11 +234,11 @@ def _write_batch_results(bucket: str, run_id: str, idx: int, count: int, err_cou
         "quarterCrossovers": batch.quarter_crossovers, "quarterCrossdowns": batch.quarter_crossdowns, "quarterBelow": batch.quarter_below, "quarterAbove": batch.quarter_above,
         "stats": batch.stats_data,
     }
-    _put_json(bucket, f"batches/{run_id}/batch-{idx:03d}.json", body)
+    storage.put_json(bucket, f"batches/{run_id}/batch-{idx:03d}.json", body)
 
 
 def _write_errors(bucket: str, run_id: str, batch_index: int, errors: list[dict]) -> None:
-    _put_json(bucket, f"logs/{run_id}/errors-{batch_index:03d}.json", errors)
+    storage.put_json(bucket, f"logs/{run_id}/errors-{batch_index:03d}.json", errors)
 
 
 def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
@@ -256,12 +246,8 @@ def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
     return len(storage.list_objects(bucket, f"batches/{run_id}/")) >= total_batches
 
 
-def _aggregate_results(bucket: str, run_id: str, total_batches: int, *, snapshot: bool = False) -> None:
-    _aggregate_and_finalize(bucket, run_id, total_batches, snapshot=snapshot)
-
-
 def _aggregate_and_finalize(bucket: str, run_id: str, total: int, *, snapshot: bool = False) -> None:
-    batch_data = [_read_json(bucket, f"batches/{run_id}/batch-{i:03d}.json") for i in range(total)]
+    batch_data = [storage.read_json(bucket, f"batches/{run_id}/batch-{i:03d}.json") for i in range(total)]
     aggregated, total_symbols, total_errors = aggregator.aggregate_batches(batch_data)
     _write_results(bucket, aggregated, total_symbols, total_errors, snapshot=snapshot)
 
@@ -285,20 +271,20 @@ def _write_results(bucket: str, agg: dict, total_sym: int, total_err: int, *, sn
 
     for suffix, keys in _RESULT_FILES:
         res = {**base, **{k: agg[k] for k in keys}}
-        _put_json(bucket, f"results/latest{suffix}.json", res)
+        storage.put_json(bucket, f"results/latest{suffix}.json", res)
         if snapshot:
-            _put_json(bucket, f"results/{scan_date}{suffix}.json", res)
+            storage.put_json(bucket, f"results/{scan_date}{suffix}.json", res)
 
     agg["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
-    _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": agg["errorDetails"]})
+    storage.put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": agg["errorDetails"]})
 
     agg["stats"].sort(key=lambda x: x.get("symbol", ""))
     misc = _compute_misc_stats(agg["stats"], len(agg["weekAbove"]), total_sym)
     stats_res = {**base, "stats": agg["stats"], "misc": misc}
-    _put_json(bucket, "results/latest-stats.json", stats_res)
+    storage.put_json(bucket, "results/latest-stats.json", stats_res)
 
     if snapshot:
-        _put_json(bucket, f"results/{scan_date}-stats.json", stats_res)
+        storage.put_json(bucket, f"results/{scan_date}-stats.json", stats_res)
         _update_manifest(bucket, scan_date)
 
 
@@ -343,7 +329,7 @@ def _compute_misc_stats(all_stats: list[dict], week_above_count: int = 0, total_
 
 
 def _update_manifest(bucket: str, scan_date: str) -> None:
-    manifest = _read_json(bucket, "results/manifest.json") or {"weeks": []}
+    manifest = storage.read_json(bucket, "results/manifest.json") or {"weeks": []}
     weeks: list[str] = manifest.get("weeks", [])
     if scan_date in weeks: weeks.remove(scan_date)
     weeks.insert(0, scan_date)
@@ -354,7 +340,7 @@ def _update_manifest(bucket: str, scan_date: str) -> None:
     for old_date in trimmed:
         _delete_snapshot(bucket, old_date)
 
-    _put_json(bucket, "results/manifest.json", {"weeks": weeks})
+    storage.put_json(bucket, "results/manifest.json", {"weeks": weeks})
 
 
 def _delete_snapshot(bucket: str, scan_date: str) -> None:
