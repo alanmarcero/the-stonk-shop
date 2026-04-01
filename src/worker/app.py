@@ -82,25 +82,39 @@ def _strip_incomplete_week(closes: list[float], timestamps: list[int]) -> tuple[
 
 
 def _aggregate_to_monthly(closes: list[float], timestamps: list[int]) -> list[float]:
-    """Take the last close per calendar month from weekly data."""
+    """Take the last close per calendar month from weekly data, excluding current month."""
     if not closes:
         return []
+    
+    now = datetime.now(timezone.utc)
     monthly: dict[tuple[int, int], float] = {}
+    
     for close, ts in zip(closes, timestamps):
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        monthly[(dt.year, dt.month)] = close
-    return list(monthly.values())
+        # Only include if month is before current month OR it's a previous year
+        if dt.year < now.year or dt.month < now.month:
+            monthly[(dt.year, dt.month)] = close
+            
+    return [monthly[k] for k in sorted(monthly.keys())]
 
 
 def _aggregate_to_quarterly(closes: list[float], timestamps: list[int]) -> list[float]:
-    """Take the last close per calendar quarter from weekly data."""
+    """Take the last close per calendar quarter from weekly data, excluding current quarter."""
     if not closes:
         return []
+    
+    now = datetime.now(timezone.utc)
+    now_q = (now.month - 1) // 3 + 1
     quarterly: dict[tuple[int, int], float] = {}
+    
     for close, ts in zip(closes, timestamps):
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        quarterly[(dt.year, (dt.month - 1) // 3 + 1)] = close
-    return list(quarterly.values())
+        q = (dt.month - 1) // 3 + 1
+        # Only include if quarter is before current quarter OR it's a previous year
+        if dt.year < now.year or q < now_q:
+            quarterly[(dt.year, q)] = close
+            
+    return [quarterly[k] for k in sorted(quarterly.keys())]
 
 
 def _pct_diff(close: float, ema_value: float) -> float:
