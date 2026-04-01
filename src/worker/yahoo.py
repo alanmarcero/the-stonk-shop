@@ -22,7 +22,7 @@ def fetch_quarterly_candles(symbol: str) -> Optional[tuple[list[float], list[int
 
 
 def fetch_stats_candles(symbol: str) -> Optional[tuple[list[float], list[int], str]]:
-    return _fetch_candles(symbol, range_param="3y", interval="1d")
+    return _fetch_candles(symbol, range_param="5y", interval="1d")
 
 
 def fetch_vix_candles() -> Optional[tuple[list[float], list[int], str]]:
