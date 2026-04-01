@@ -8,7 +8,6 @@ from typing import Any, Optional
 import boto3
 
 # Dual import supports both Lambda (package) and direct test execution contexts.
-# Force update to ensure Name column is deployed.
 try:
     from . import ema, stats, yahoo
 except ImportError:
@@ -88,8 +87,7 @@ def _aggregate_to_monthly(closes: list[float], timestamps: list[int]) -> list[fl
     monthly: dict[tuple[int, int], float] = {}
     for close, ts in zip(closes, timestamps):
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        key = (dt.year, dt.month)
-        monthly[key] = close
+        monthly[(dt.year, dt.month)] = close
     return list(monthly.values())
 
 
@@ -100,9 +98,7 @@ def _aggregate_to_quarterly(closes: list[float], timestamps: list[int]) -> list[
     quarterly: dict[tuple[int, int], float] = {}
     for close, ts in zip(closes, timestamps):
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        quarter = (dt.month - 1) // 3 + 1
-        key = (dt.year, quarter)
-        quarterly[key] = close
+        quarterly[(dt.year, (dt.month - 1) // 3 + 1)] = close
     return list(quarterly.values())
 
 
@@ -184,8 +180,6 @@ def _process_batch(
         if i > 0:
             time.sleep(RATE_LIMIT_DELAY)
 
-        # Two API calls instead of four: 5y weekly covers weekly/monthly/quarterly
-        # EMA analysis, 3y daily covers daily EMA and all stats computations.
         weekly_result = yahoo.fetch_quarterly_candles(symbol)
         daily_result = yahoo.fetch_stats_candles(symbol)
 
@@ -194,28 +188,15 @@ def _process_batch(
             batch.errors.append({"symbol": symbol, "error": "Failed to fetch candles"})
             continue
 
-        # Extract name from either successful fetch
-        name = ""
-        if weekly_result:
-            name = weekly_result[2]
-        elif daily_result:
-            name = daily_result[2]
+        name = weekly_result[2] if weekly_result else daily_result[2]
 
-        weekly = _process_timeframe(
-            symbol, name, weekly_result, "weeksBelow", "weeksAbove",
-            min_below=MIN_WEEKS_THRESHOLD,
-        )
-        monthly = _process_timeframe(
-            symbol, name, weekly_result, "monthsBelow", "monthsAbove",
-            aggregate_fn=_aggregate_to_monthly,
-        )
-        quarterly = _process_timeframe(
-            symbol, name, weekly_result, "quartersBelow", "quartersAbove",
-            aggregate_fn=_aggregate_to_quarterly,
-        )
-
+        weekly = _process_timeframe(symbol, name, weekly_result, "weeksBelow", "weeksAbove", min_below=MIN_WEEKS_THRESHOLD)
         _append_timeframe_results(batch, weekly, "crossovers", "crossdowns", "week_below", "week_above")
+
+        monthly = _process_timeframe(symbol, name, weekly_result, "monthsBelow", "monthsAbove", aggregate_fn=_aggregate_to_monthly)
         _append_timeframe_results(batch, monthly, "month_crossovers", "month_crossdowns", "month_below", "month_above")
+
+        quarterly = _process_timeframe(symbol, name, weekly_result, "quartersBelow", "quartersAbove", aggregate_fn=_aggregate_to_quarterly)
         _append_timeframe_results(batch, quarterly, "quarter_crossovers", "quarter_crossdowns", "quarter_below", "quarter_above")
 
         if daily_result is not None:
@@ -229,25 +210,23 @@ def _process_batch(
                 weekly_closes=q_closes,
             )
             if computed is not None:
-                computed["symbol"] = symbol
-                computed["name"] = name
-                if symbol == "VOO":
-                    closes, timestamps = daily_result[0], daily_result[1]
-                    election = stats.compute_return_since(closes, timestamps, 2024, 11, 5)
-                    if election is not None:
-                        computed["spxSinceElection"] = election
-                    inauguration = stats.compute_return_since(closes, timestamps, 2025, 1, 20)
-                    if inauguration is not None:
-                        computed["spxSinceInauguration"] = inauguration
-                if symbol in _5Y_RETURN_SYMBOLS and weekly_result is not None:
-                    ret = stats.compute_return_since(
-                        weekly_result[0], weekly_result[1], 2021, 3, 28,
-                    )
-                    if ret is not None:
-                        computed["return5Y"] = ret
+                computed.update({"symbol": symbol, "name": name})
+                _add_special_stats(symbol, computed, daily_result, weekly_result)
                 batch.stats_data.append(computed)
 
     return batch
+
+
+def _add_special_stats(symbol: str, computed: dict, daily_result: tuple, weekly_result: Optional[tuple]) -> None:
+    if symbol == "VOO":
+        election = stats.compute_return_since(daily_result[0], daily_result[1], 2024, 11, 5)
+        if election is not None: computed["spxSinceElection"] = election
+        inauguration = stats.compute_return_since(daily_result[0], daily_result[1], 2025, 1, 20)
+        if inauguration is not None: computed["spxSinceInauguration"] = inauguration
+    
+    if symbol in _5Y_RETURN_SYMBOLS and weekly_result is not None:
+        ret = stats.compute_return_since(weekly_result[0], weekly_result[1], 2021, 3, 28)
+        if ret is not None: computed["return5Y"] = ret
 
 
 def _process_timeframe(
@@ -259,10 +238,7 @@ def _process_timeframe(
     aggregate_fn=None,
     min_below: int = 0,
 ) -> dict[str, Optional[dict]]:
-    """Process candles for a single timeframe (weekly/monthly/quarterly).
-
-    Returns dict with keys: crossover, crossdown, below, above (each Optional[dict]).
-    """
+    """Process candles for a single timeframe (weekly/monthly/quarterly)."""
     empty = {"crossover": None, "crossdown": None, "below": None, "above": None}
     if candle_result is None:
         return empty
@@ -270,32 +246,27 @@ def _process_timeframe(
     closes, timestamps = _strip_incomplete_week(candle_result[0], candle_result[1])
     if aggregate_fn is not None:
         closes = aggregate_fn(closes, timestamps)
+    
     ema_value = ema.calculate(closes)
     if ema_value is None:
         return empty
+    
     last_close = closes[-1]
+    res = empty.copy()
 
-    crossover = None
-    periods_below = ema.detect_weekly_crossover(closes)
-    if periods_below is not None:
-        crossover = _crossover_entry(symbol, name, last_close, ema_value, periods_below, cross_up_key)
+    if (p_below := ema.detect_weekly_crossover(closes)) is not None:
+        res["crossover"] = _crossover_entry(symbol, name, last_close, ema_value, p_below, cross_up_key)
 
-    crossdown = None
-    periods_above = ema.detect_weekly_crossdown(closes)
-    if periods_above is not None:
-        crossdown = _crossdown_entry(symbol, name, last_close, ema_value, periods_above, cross_down_key)
+    if (p_above := ema.detect_weekly_crossdown(closes)) is not None:
+        res["crossdown"] = _crossdown_entry(symbol, name, last_close, ema_value, p_above, cross_down_key)
 
-    below = None
-    below_count = ema.count_periods_below(closes)
-    if below_count is not None and below_count >= min_below:
-        below = _below_entry(symbol, name, last_close, ema_value, below_count)
+    if (b_count := ema.count_periods_below(closes)) is not None and b_count >= min_below:
+        res["below"] = _below_entry(symbol, name, last_close, ema_value, b_count)
 
-    above = None
-    above_count = ema.count_periods_above(closes)
-    if above_count is not None:
-        above = _above_entry(symbol, name, last_close, ema_value, above_count)
+    if (a_count := ema.count_periods_above(closes)) is not None:
+        res["above"] = _above_entry(symbol, name, last_close, ema_value, a_count)
 
-    return {"crossover": crossover, "crossdown": crossdown, "below": below, "above": above}
+    return res
 
 
 def _write_batch_results(
@@ -366,8 +337,7 @@ def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
     prefix = f"batches/{run_id}/"
     try:
         resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        count = resp.get("KeyCount", 0)
-        return count >= total_batches
+        return resp.get("KeyCount", 0) >= total_batches
     except Exception as err:
         print(f"[worker] failed to list batches: {err}")
         return False
@@ -383,8 +353,7 @@ def _read_batches(
     bucket: str, run_id: str, total_batches: int,
 ) -> tuple[dict[str, list[dict]], int, int]:
     aggregated: dict[str, list[dict]] = {key: [] for key, _ in _AGGREGATE_KEYS}
-    aggregated["stats"] = []
-    aggregated["errorDetails"] = []
+    aggregated.update({"stats": [], "errorDetails": []})
     total_symbols = 0
     total_errors = 0
 
@@ -414,21 +383,18 @@ def _write_results(
 ) -> None:
     now = datetime.now(timezone.utc)
     scan_date = now.strftime("%Y-%m-%d")
-    scan_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-
     base = {
         "scanDate": scan_date,
-        "scanTime": scan_time,
+        "scanTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "symbolsScanned": total_symbols,
         "errors": total_errors,
     }
 
-    results_by_suffix = {}
     for suffix, keys in _RESULT_FILES:
-        results_by_suffix[suffix] = {**base, **{k: aggregated[k] for k in keys}}
-
-    for suffix, _ in _RESULT_FILES:
-        _put_json(bucket, f"results/latest{suffix}.json", results_by_suffix[suffix])
+        res = {**base, **{k: aggregated[k] for k in keys}}
+        _put_json(bucket, f"results/latest{suffix}.json", res)
+        if snapshot:
+            _put_json(bucket, f"results/{scan_date}{suffix}.json", res)
 
     aggregated["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
     _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": aggregated["errorDetails"]})
@@ -439,8 +405,6 @@ def _write_results(
     _put_json(bucket, "results/latest-stats.json", stats_result)
 
     if snapshot:
-        for suffix, _ in _RESULT_FILES:
-            _put_json(bucket, f"results/{scan_date}{suffix}.json", results_by_suffix[suffix])
         _put_json(bucket, f"results/{scan_date}-stats.json", stats_result)
         _update_manifest(bucket, scan_date)
 
@@ -455,58 +419,39 @@ def _compute_misc_stats(
         return {}
 
     total = len(all_stats)
-
-    high_pcts = [s["highPct"] for s in all_stats if "highPct" in s]
-    ytd_pcts = [s["ytdPct"] for s in all_stats if "ytdPct" in s]
-    forward_pes = [s["forwardPE"] for s in all_stats if "forwardPE" in s]
+    h_pcts = [s["highPct"] for s in all_stats if "highPct" in s]
+    y_pcts = [s["ytdPct"] for s in all_stats if "ytdPct" in s]
+    f_pes = [s["forwardPE"] for s in all_stats if "forwardPE" in s]
 
     misc: dict = {}
 
-    if high_pcts and total > 0:
-        within_5 = sum(1 for h in high_pcts if h >= -5)
-        misc["pctWithin5OfHigh"] = round(within_5 / total * 100, 1)
+    if h_pcts and total > 0:
+        misc["pctWithin5OfHigh"] = round(sum(1 for h in h_pcts if h >= -5) / total * 100, 1)
 
-    if ytd_pcts:
-        positive_ytd = sum(1 for y in ytd_pcts if y >= 0)
-        if total > 0:
-            misc["pctPositiveYTD"] = round(positive_ytd / total * 100, 1)
-        if len(ytd_pcts) > 0:
-            misc["avgYTD"] = round(sum(ytd_pcts) / len(ytd_pcts), 2)
+    if y_pcts and total > 0:
+        misc["pctPositiveYTD"] = round(sum(1 for y in y_pcts if y >= 0) / total * 100, 1)
+        misc["avgYTD"] = round(sum(y_pcts) / len(y_pcts), 2)
 
-    if forward_pes:
-        misc["avgForwardPE"] = round(sum(forward_pes) / len(forward_pes), 2)
-        sorted_pes = sorted(forward_pes)
+    if f_pes:
+        misc["avgForwardPE"] = round(sum(f_pes) / len(f_pes), 2)
+        sorted_pes = sorted(f_pes)
         mid = len(sorted_pes) // 2
-        if len(sorted_pes) % 2 == 0 and mid > 0:
-            misc["medianForwardPE"] = round((sorted_pes[mid - 1] + sorted_pes[mid]) / 2, 2)
-        else:
-            misc["medianForwardPE"] = round(sorted_pes[mid], 2)
+        misc["medianForwardPE"] = round((sorted_pes[mid-1] + sorted_pes[mid]) / 2 if len(sorted_pes) % 2 == 0 else sorted_pes[mid], 2)
 
-    # EMA above/below percentages
     if total_symbols > 0:
         misc["pctAbove5wkEMA"] = round(week_above_count / total_symbols * 100, 1)
         misc["pctBelow5wkEMA"] = round((total_symbols - week_above_count) / total_symbols * 100, 1)
 
-    # SMA breadth
-    above_200d = sum(1 for s in all_stats if s.get("pctSma200d") is not None and s["pctSma200d"] >= 0)
-    has_200d = sum(1 for s in all_stats if s.get("pctSma200d") is not None)
-    if has_200d > 0:
-        misc["pctAbove200dSMA"] = round(above_200d / has_200d * 100, 1)
+    for key, field in [("pctAbove200dSMA", "pctSma200d"), ("pctAbove200wSMA", "pctSma200w")]:
+        vals = [s[field] for s in all_stats if s.get(field) is not None]
+        if vals:
+            misc[key] = round(sum(1 for v in vals if v >= 0) / len(vals) * 100, 1)
 
-    above_200w = sum(1 for s in all_stats if s.get("pctSma200w") is not None and s["pctSma200w"] >= 0)
-    has_200w = sum(1 for s in all_stats if s.get("pctSma200w") is not None)
-    if has_200w > 0:
-        misc["pctAbove200wSMA"] = round(above_200w / has_200w * 100, 1)
-
-    # SPX milestone returns (from VOO)
     voo = next((s for s in all_stats if s.get("symbol") == "VOO"), None)
     if voo:
-        if "spxSinceElection" in voo:
-            misc["spxSinceElection"] = voo["spxSinceElection"]
-        if "spxSinceInauguration" in voo:
-            misc["spxSinceInauguration"] = voo["spxSinceInauguration"]
+        for k in ("spxSinceElection", "spxSinceInauguration"):
+            if k in voo: misc[k] = voo[k]
 
-    # 5-year returns for key symbols
     for sym in ("SPY", "QQQ", "DIA", "IWM", "TMUS"):
         entry = next((s for s in all_stats if s.get("symbol") == sym), None)
         if entry and "return5Y" in entry:
@@ -519,11 +464,9 @@ def _update_manifest(bucket: str, scan_date: str) -> None:
     manifest = _read_json(bucket, "results/manifest.json") or {"weeks": []}
     weeks: list[str] = manifest.get("weeks", [])
 
-    if scan_date not in weeks:
-        weeks.insert(0, scan_date)
-    else:
+    if scan_date in weeks:
         weeks.remove(scan_date)
-        weeks.insert(0, scan_date)
+    weeks.insert(0, scan_date)
 
     trimmed = weeks[MAX_WEEKLY_SNAPSHOTS:]
     weeks = weeks[:MAX_WEEKLY_SNAPSHOTS]
@@ -540,7 +483,7 @@ def _delete_snapshot(bucket: str, scan_date: str) -> None:
         key = f"results/{scan_date}{suffix}.json"
         try:
             s3.delete_object(Bucket=bucket, Key=key)
-        except Exception as err:  # Broad catch: S3 errors must not halt cleanup of other snapshots
+        except Exception as err:
             print(f"[worker] failed to delete s3://{bucket}/{key}: {err}")
 
 
@@ -548,9 +491,13 @@ def _read_json(bucket: str, key: str) -> Any:
     try:
         resp = s3.get_object(Bucket=bucket, Key=key)
         return json.loads(resp["Body"].read())
-    except Exception as err:  # Broad catch: missing/corrupt batch files should not abort aggregation
+    except Exception as err:
         print(f"[worker] failed to read s3://{bucket}/{key}: {err}")
         return None
+
+
+def _put_json(bucket: str, key: str, data: Any) -> None:
+    s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(data))
 
 
 def _invalidate_cache() -> None:
@@ -566,7 +513,3 @@ def _invalidate_cache() -> None:
         },
     )
     print(f"[worker] CloudFront invalidation created for {dist_id}")
-
-
-def _put_json(bucket: str, key: str, data: Any) -> None:
-    s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(data))

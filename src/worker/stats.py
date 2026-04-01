@@ -13,18 +13,13 @@ def compute_ytd_pct(closes: list[float], timestamps: list[int]) -> Optional[floa
     if len(closes) < 2:
         return None
 
-    current_year = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc).year
-    prev_year = current_year - 1
-
-    dec31_close = None
-    for close, ts in zip(closes, timestamps):
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        if dt.year == prev_year:
-            dec31_close = close
-
-    if dec31_close is None:
+    curr_year = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc).year
+    # Find last close of previous year
+    prev_closes = [c for c, ts in zip(closes, timestamps) if datetime.fromtimestamp(ts, tz=timezone.utc).year < curr_year]
+    if not prev_closes:
         return None
-
+    
+    dec31_close = prev_closes[-1]
     return round((closes[-1] - dec31_close) / dec31_close * 100, 2)
 
 
@@ -33,22 +28,16 @@ def compute_highest_close_pct(closes: list[float]) -> Optional[tuple[float, floa
     if not closes:
         return None
     high = max(closes)
-    if high <= 0:
-        return 0.0, high
-    pct = round((closes[-1] - high) / high * 100, 2)
-    return pct, high
+    return (round((closes[-1] - high) / high * 100, 2) if high > 0 else 0.0), high
 
 
 def compute_lowest_close_pct(closes: list[float]) -> Optional[tuple[float, float]]:
     """Return (pct above 52wk low, the low value) using last 252 closes."""
     if not closes:
         return None
-    window = closes[-252:] if len(closes) >= 252 else closes
+    window = closes[-252:]
     low = min(window)
-    if low <= 0:
-        return 0.0, low
-    pct = round((closes[-1] - low) / low * 100, 2)
-    return pct, low
+    return (round((closes[-1] - low) / low * 100, 2) if low > 0 else 0.0), low
 
 
 def compute_return_since(
@@ -62,15 +51,15 @@ def compute_return_since(
     if len(closes) < 2:
         return None
     target = datetime(year, month, day, tzinfo=timezone.utc).timestamp()
-    best_idx = None
-    best_diff = float("inf")
     three_days = 3 * 86400
-    for i, ts in enumerate(timestamps):
-        diff = abs(ts - target)
-        if diff < best_diff and diff <= three_days:
-            best_diff = diff
-            best_idx = i
-    if best_idx is None or closes[best_idx] == 0:
+    
+    # Find best match within 3 days
+    matches = [(abs(ts - target), i) for i, ts in enumerate(timestamps) if abs(ts - target) <= three_days]
+    if not matches:
+        return None
+    
+    _, best_idx = min(matches)
+    if closes[best_idx] == 0:
         return None
     return round((closes[-1] - closes[best_idx]) / closes[best_idx] * 100, 2)
 
@@ -87,68 +76,38 @@ def compute_stats(
     if len(closes) < 2:
         return None
 
-    stats: dict = {"close": round(closes[-1], 2)}
+    stats_res: dict = {"close": round(closes[-1], 2)}
 
-    ytd = compute_ytd_pct(closes, timestamps)
-    if ytd is not None:
-        stats["ytdPct"] = ytd
+    if (ytd := compute_ytd_pct(closes, timestamps)) is not None:
+        stats_res["ytdPct"] = ytd
 
-    high_result = compute_highest_close_pct(closes)
-    if high_result is not None:
-        stats["highPct"] = high_result[0]
-        stats["high3yr"] = round(high_result[1], 2)
+    if high_res := compute_highest_close_pct(closes):
+        stats_res["highPct"], stats_res["high3yr"] = high_res[0], round(high_res[1], 2)
 
-    low_result = compute_lowest_close_pct(closes)
-    if low_result is not None:
-        stats["lowPct"] = low_result[0]
-        stats["low52wk"] = round(low_result[1], 2)
+    if low_res := compute_lowest_close_pct(closes):
+        stats_res["lowPct"], stats_res["low52wk"] = low_res[0], round(low_res[1], 2)
 
-    # Swing levels
-    swing_result = swing.analyze(closes, timestamps)
-    if swing_result is not None:
-        stats.update(swing_result)
+    if s_res := swing.analyze(closes, timestamps):
+        stats_res.update(s_res)
 
-    # RSI
-    rsi_value = rsi.calculate(closes)
-    if rsi_value is not None:
-        stats["rsi"] = rsi_value
+    if (r_val := rsi.calculate(closes)) is not None:
+        stats_res["rsi"] = r_val
 
-    # Quarterly changes
-    q_result = quarterly.compute_quarterly_changes(closes, timestamps)
-    if q_result is not None:
-        stats["sinceQuarter"] = q_result["sinceQuarter"]
-        stats["duringQuarter"] = q_result["duringQuarter"]
+    if q_res := quarterly.compute_quarterly_changes(closes, timestamps):
+        stats_res.update({"sinceQuarter": q_res["sinceQuarter"], "duringQuarter": q_res["duringQuarter"]})
 
-    # VIX spike returns
-    if vix_spikes:
-        vix_returns = vix.compute_spike_returns(
-            vix_spikes, closes, timestamps, closes[-1]
-        )
-        if vix_returns:
-            stats["vixReturns"] = vix_returns
+    if vix_spikes and (v_res := vix.compute_spike_returns(vix_spikes, closes, timestamps, closes[-1])):
+        stats_res["vixReturns"] = v_res
 
-    # 200-day SMA
     if len(closes) >= 200:
-        sma200d = round(sum(closes[-200:]) / 200, 2)
-        stats["sma200d"] = sma200d
-        if sma200d > 0:
-            stats["pctSma200d"] = round((closes[-1] - sma200d) / sma200d * 100, 2)
-        else:
-            stats["pctSma200d"] = 0.0
+        sma = round(sum(closes[-200:]) / 200, 2)
+        stats_res.update({"sma200d": sma, "pctSma200d": round((closes[-1] - sma) / sma * 100, 2) if sma > 0 else 0.0})
 
-    # 200-week SMA
-    if weekly_closes is not None and len(weekly_closes) >= 200:
-        sma200w = round(sum(weekly_closes[-200:]) / 200, 2)
-        stats["sma200w"] = sma200w
-        if sma200w > 0:
-            stats["pctSma200w"] = round((closes[-1] - sma200w) / sma200w * 100, 2)
-        else:
-            stats["pctSma200w"] = 0.0
+    if weekly_closes and len(weekly_closes) >= 200:
+        smaw = round(sum(weekly_closes[-200:]) / 200, 2)
+        stats_res.update({"sma200w": smaw, "pctSma200w": round((closes[-1] - smaw) / smaw * 100, 2) if smaw > 0 else 0.0})
 
-    # Forward P/E
-    if forward_pe is not None:
-        stats["forwardPE"] = forward_pe
-    if forward_pe_history is not None:
-        stats["forwardPEHistory"] = forward_pe_history
+    if forward_pe is not None: stats_res["forwardPE"] = forward_pe
+    if forward_pe_history: stats_res["forwardPEHistory"] = forward_pe_history
 
-    return stats
+    return stats_res
