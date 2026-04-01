@@ -28,7 +28,7 @@ EventBridge (Scheduler) → Orchestrator Lambda → SQS → Worker Lambda → S3
 src/
   orchestrator/    # Fan-out with SQS batching
   worker/          # Analysis engine: EMA, RSI, swing, quarterly, VIX, stats
-tests/             # 340 tests (100% pass)
+tests/             # 233 tests (100% pass)
 web/               # Single-page dashboard (index.html)
 terraform/         # IaC: S3 OAC, CloudFront, Lambda URLs, IAM
 scripts/           # Diagnostic and maintenance utilities
@@ -48,7 +48,7 @@ aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 ## Deployment
 
 **GitHub Actions:** Automatically triggered on push to `main`.
-1.  **Test:** Executes 340 unit tests via `pytest`.
+1.  **Test:** Executes 233 unit tests via `pytest`.
 2.  **Infrastructure:** Applies Terraform changes (IAM, Lambda, SQS, S3).
 3.  **App:** Injects `ORCHESTRATOR_URL` into `index.html` and deploys to S3.
 4.  **CDN:** Invalidates CloudFront cache for instant updates.
