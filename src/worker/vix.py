@@ -20,25 +20,29 @@ def detect_spikes(
     current_cluster: list[int] = [spike_indices[0]]
 
     for i in range(1, len(spike_indices)):
-        gap = spike_indices[i] - spike_indices[i - 1]
-        if gap <= gap_days + 1:
+        if spike_indices[i] - spike_indices[i - 1] <= gap_days + 1:
             current_cluster.append(spike_indices[i])
-        else:
-            clusters.append(current_cluster)
-            current_cluster = [spike_indices[i]]
+            continue
+        
+        clusters.append(current_cluster)
+        current_cluster = [spike_indices[i]]
+    
     clusters.append(current_cluster)
 
-    spikes = []
-    for cluster in clusters:
-        peak_index = max(cluster, key=lambda idx: closes[idx])
-        dt = datetime.fromtimestamp(timestamps[peak_index], tz=timezone.utc)
-        spikes.append({
-            "dateString": f"{dt.month}/{dt.day}/{dt.strftime('%y')}",
-            "timestamp": timestamps[peak_index],
-            "vixClose": round(closes[peak_index], 2),
-        })
+    return [
+        _format_spike(cluster, closes, timestamps)
+        for cluster in clusters
+    ]
 
-    return spikes
+
+def _format_spike(cluster: list[int], closes: list[float], timestamps: list[int]) -> dict:
+    peak_index = max(cluster, key=lambda idx: closes[idx])
+    dt = datetime.fromtimestamp(timestamps[peak_index], tz=timezone.utc)
+    return {
+        "dateString": f"{dt.month}/{dt.day}/{dt.strftime('%y')}",
+        "timestamp": timestamps[peak_index],
+        "vixClose": round(closes[peak_index], 2),
+    }
 
 
 def compute_spike_returns(
@@ -58,17 +62,15 @@ def compute_spike_returns(
 
     results = []
     for spike in spikes:
-        spike_ts = spike["timestamp"]
-        spike_close = _find_closest_close(spike_ts, timestamps, ts_to_close)
+        spike_close = _find_closest_close(spike["timestamp"], timestamps, ts_to_close)
         if spike_close is None or spike_close == 0:
             continue
 
-        pct_gain = round((current_close - spike_close) / spike_close * 100, 2)
         results.append({
             "dateString": spike["dateString"],
             "vixClose": spike["vixClose"],
             "spikeClose": round(spike_close, 2),
-            "pctGain": pct_gain,
+            "pctGain": round((current_close - spike_close) / spike_close * 100, 2),
         })
 
     return results
@@ -83,14 +85,15 @@ def _find_closest_close(
     if target_ts in ts_to_close:
         return ts_to_close[target_ts]
 
-    best_ts = None
-    best_diff = float("inf")
     three_days = 3 * 86400
-
-    for ts in timestamps:
-        diff = abs(ts - target_ts)
-        if diff <= three_days and diff < best_diff:
-            best_diff = diff
-            best_ts = ts
-
-    return ts_to_close.get(best_ts) if best_ts is not None else None
+    matches = [
+        (abs(ts - target_ts), ts)
+        for ts in timestamps
+        if abs(ts - target_ts) <= three_days
+    ]
+    
+    if not matches:
+        return None
+        
+    _, best_ts = min(matches)
+    return ts_to_close.get(best_ts)

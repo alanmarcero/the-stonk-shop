@@ -24,18 +24,18 @@ def analyze(
 
     result = {}
     if breakout is not None:
-        result["breakoutPrice"] = round(breakout["price"], 2)
-        result["breakoutDate"] = breakout["date"]
-        result["breakoutPct"] = round(
-            (closes[-1] - breakout["price"]) / breakout["price"] * 100, 2
-        )
+        result.update({
+            "breakoutPrice": round(breakout["price"], 2),
+            "breakoutDate": breakout["date"],
+            "breakoutPct": round((closes[-1] - breakout["price"]) / breakout["price"] * 100, 2),
+        })
 
     if breakdown is not None:
-        result["breakdownPrice"] = round(breakdown["price"], 2)
-        result["breakdownDate"] = breakdown["date"]
-        result["breakdownPct"] = round(
-            (closes[-1] - breakdown["price"]) / breakdown["price"] * 100, 2
-        )
+        result.update({
+            "breakdownPrice": round(breakdown["price"], 2),
+            "breakdownDate": breakdown["date"],
+            "breakdownPct": round((closes[-1] - breakdown["price"]) / breakdown["price"] * 100, 2),
+        })
 
     return result
 

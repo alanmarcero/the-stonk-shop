@@ -20,15 +20,12 @@ sqs = boto3.client("sqs")
 def lambda_handler(event: dict, context: Any) -> dict:
     bucket = os.environ["BUCKET_NAME"]
     queue_url = os.environ["QUEUE_URL"]
-    # Fallback to a hard-to-guess string if DEV_KEY is missing
     dev_key = os.environ.get("DEV_KEY", "stonks-unconfigured-fallback")
 
     is_http = "requestContext" in event and "http" in event["requestContext"]
-    if is_http:
-        qs = event.get("queryStringParameters", {})
-        if qs.get("dev_key") != dev_key:
-            print(f"[orchestrator] Unauthorized HTTP access attempt")
-            return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
+    if is_http and event.get("queryStringParameters", {}).get("dev_key") != dev_key:
+        print(f"[orchestrator] Unauthorized HTTP access attempt")
+        return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
 
     attrs = sqs.get_queue_attributes(
         QueueUrl=queue_url,
@@ -62,17 +59,13 @@ def lambda_handler(event: dict, context: Any) -> dict:
     symbols = [line.strip() for line in lines if line.strip()]
 
     vix_spikes = _fetch_vix_spikes()
-
     snapshot = event.get("snapshot", False)
-
     run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     batches = [symbols[i : i + BATCH_SIZE] for i in range(0, len(symbols), BATCH_SIZE)]
     total_batches = len(batches)
 
-    # Send messages in batches of 10 for efficiency (SQS limit)
-    sqs_messages = []
-    for idx, batch in enumerate(batches):
-        sqs_messages.append({
+    sqs_messages = [
+        {
             "Id": f"batch_{idx}",
             "MessageBody": json.dumps({
                 "runId": run_id,
@@ -82,13 +75,12 @@ def lambda_handler(event: dict, context: Any) -> dict:
                 "vixSpikes": vix_spikes,
                 "snapshot": snapshot,
             })
-        })
+        }
+        for idx, batch in enumerate(batches)
+    ]
 
     for i in range(0, len(sqs_messages), 10):
-        sqs.send_message_batch(
-            QueueUrl=queue_url,
-            Entries=sqs_messages[i : i + 10]
-        )
+        sqs.send_message_batch(QueueUrl=queue_url, Entries=sqs_messages[i : i + 10])
 
     return {
         "statusCode": 200,
@@ -130,10 +122,7 @@ def _fetch_vix_spikes() -> list[dict]:
     return _detect_vix_spikes(closes, timestamps)
 
 
-def _detect_vix_spikes(
-    closes: list[float],
-    timestamps: list[int],
-) -> list[dict]:
+def _detect_vix_spikes(closes: list[float], timestamps: list[int]) -> list[dict]:
     """Detect VIX spike clusters. Returns list of {dateString, timestamp, vixClose}."""
     if len(closes) != len(timestamps) or not closes:
         return []
@@ -146,22 +135,26 @@ def _detect_vix_spikes(
     current_cluster: list[int] = [spike_indices[0]]
 
     for i in range(1, len(spike_indices)):
-        gap = spike_indices[i] - spike_indices[i - 1]
-        if gap <= VIX_GAP_DAYS + 1:
+        if spike_indices[i] - spike_indices[i - 1] <= VIX_GAP_DAYS + 1:
             current_cluster.append(spike_indices[i])
-        else:
-            clusters.append(current_cluster)
-            current_cluster = [spike_indices[i]]
+            continue
+        
+        clusters.append(current_cluster)
+        current_cluster = [spike_indices[i]]
+    
     clusters.append(current_cluster)
 
-    spikes = []
-    for cluster in clusters:
-        peak_index = max(cluster, key=lambda idx: closes[idx])
-        dt = datetime.fromtimestamp(timestamps[peak_index], tz=timezone.utc)
-        spikes.append({
-            "dateString": f"{dt.month}/{dt.day}/{dt.strftime('%y')}",
-            "timestamp": timestamps[peak_index],
-            "vixClose": round(closes[peak_index], 2),
-        })
+    return [
+        _format_spike(cluster, closes, timestamps)
+        for cluster in clusters
+    ]
 
-    return spikes
+
+def _format_spike(cluster: list[int], closes: list[float], timestamps: list[int]) -> dict:
+    peak_index = max(cluster, key=lambda idx: closes[idx])
+    dt = datetime.fromtimestamp(timestamps[peak_index], tz=timezone.utc)
+    return {
+        "dateString": f"{dt.month}/{dt.day}/{dt.strftime('%y')}",
+        "timestamp": timestamps[peak_index],
+        "vixClose": round(closes[peak_index], 2),
+    }

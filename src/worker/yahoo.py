@@ -25,6 +25,10 @@ def fetch_stats_candles(symbol: str) -> Optional[tuple[list[float], list[int], s
     return _fetch_candles(symbol, range_param="3y", interval="1d")
 
 
+def fetch_vix_candles() -> Optional[tuple[list[float], list[int], str]]:
+    return _fetch_candles("^VIX", range_param="3y", interval="1d")
+
+
 def _fetch_candles(symbol: str, range_param: str, interval: str) -> Optional[tuple[list[float], list[int], str]]:
     url = f"{BASE_URL}/{symbol}?range={range_param}&interval={interval}"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -37,10 +41,6 @@ def _fetch_candles(symbol: str, range_param: str, interval: str) -> Optional[tup
         return None
 
     return _parse_response(response_data)
-
-
-def fetch_vix_candles() -> Optional[tuple[list[float], list[int], str]]:
-    return _fetch_candles("^VIX", range_param="3y", interval="1d")
 
 
 def fetch_forward_pe(symbol: str) -> tuple[Optional[float], Optional[dict]]:
@@ -93,21 +93,22 @@ def _parse_forward_pe_history(response_data: dict) -> Optional[dict]:
             entries = entry_group.get("quarterlyForwardPeRatio")
             if not entries:
                 continue
+            
             history = {}
             for entry in entries:
                 date_str = entry.get("asOfDate", "")
                 raw = entry.get("reportedValue", {}).get("raw")
                 if not date_str or raw is None:
                     continue
+                
                 parts = date_str.split("-")
-                if len(parts) != 3:
-                    continue
-                month = int(parts[1])
-                year = int(parts[0])
-                quarter_num = (month - 1) // 3 + 1
-                short_year = str(year)[-2:]
-                label = f"Q{quarter_num}'{short_year}"
-                history[label] = round(raw, 2)
+                if len(parts) == 3:
+                    month = int(parts[1])
+                    year = int(parts[0])
+                    quarter_num = (month - 1) // 3 + 1
+                    short_year = str(year)[-2:]
+                    history[f"Q{quarter_num}'{short_year}"] = round(raw, 2)
+            
             return history if history else None
     except (KeyError, IndexError, TypeError, ValueError) as err:
         print(f"[yahoo] parse error: {err}")
