@@ -532,7 +532,7 @@ class TestFetchStatsCandles:
         fetch_stats_candles("AAPL")
 
         request = mock_urlopen.call_args[0][0]
-        assert request.full_url == f"{BASE_URL}/AAPL?range=3y&interval=1d"
+        assert request.full_url == f"{BASE_URL}/AAPL?range=5y&interval=1d"
 
     @patch("src.worker.yahoo.urllib.request.urlopen")
     def test_success(self, mock_urlopen):

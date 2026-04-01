@@ -158,16 +158,21 @@ class TestProcessBatch:
 
     def test_spy_includes_chatgpt_returns(self, mock_worker_deps):
         mock_yahoo, _, mock_stats = mock_worker_deps
-        mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "SPY")
+        weekly_data = ([50.0] * 10, list(range(10)), "SPY")
+        mock_yahoo.fetch_quarterly_candles.return_value = weekly_data
         mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "SPY")
         mock_stats.compute_stats.return_value = {"close": 105.0}
-        # First call for ChatGPT (daily), second for 5Y (weekly)
+        # First call for ChatGPT (weekly), second for 5Y (weekly)
         mock_stats.compute_return_since.side_effect = [45.0, 85.5]
 
         result = _process_batch(["SPY"])
 
         assert result.stats_data[0]["spySinceChatGPT"] == 45.0
         assert result.stats_data[0]["return5Y"] == 85.5
+        # Should be called with weekly data (weekly_data[0/1])
+        mock_stats.compute_return_since.assert_any_call(
+            weekly_data[0], weekly_data[1], 2022, 11, 30,
+        )
 
 
 class TestEnsureOneCandlePerWeek:
