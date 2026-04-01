@@ -167,6 +167,25 @@ class TestStripIncompleteWeek:
         timestamps = [last_monday_ts - 604800, last_monday_ts, current_ts]
         result_closes, result_ts = _strip_incomplete_week(closes, timestamps)
         assert len(result_closes) == 2
+        assert result_closes[-1] == 101.0
+
+    def test_strips_multiple_candles_from_current_week(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        # Ensure we have at least 2 different timestamps in the current ISO week
+        monday = now - timedelta(days=now.weekday())
+        ts1 = int(monday.replace(hour=10).timestamp())
+        ts2 = int(monday.replace(hour=15).timestamp())
+        
+        last_week_ts = int((monday - timedelta(weeks=1)).timestamp())
+        
+        closes = [100.0, 101.0, 102.0]
+        timestamps = [last_week_ts, ts1, ts2]
+        
+        result_closes, result_ts = _strip_incomplete_week(closes, timestamps)
+        
+        assert len(result_closes) == 1
+        assert result_closes[0] == 100.0
 
     def test_keeps_complete_week_candle(self):
         from datetime import datetime, timezone, timedelta
