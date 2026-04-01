@@ -9,9 +9,17 @@ import boto3
 
 # Dual import supports both Lambda (package) and direct test execution contexts.
 try:
-    from . import ema, stats, yahoo
+    from . import aggregator, ema, stats, storage, yahoo
 except ImportError:
-    import ema, stats, yahoo
+    import aggregator, ema, stats, storage, yahoo
+
+# Define clients in app.py so tests can mock them
+s3 = boto3.client("s3")
+cloudfront = boto3.client("cloudfront")
+
+# Backward-compatibility for tests
+_read_json = storage.read_json
+_put_json = storage.put_json
 
 
 @dataclass
@@ -33,8 +41,6 @@ class BatchResult:
     stats_data: list[dict] = field(default_factory=list)
     errors: list[dict] = field(default_factory=list)
 
-s3 = boto3.client("s3")
-cloudfront = boto3.client("cloudfront")
 
 RATE_LIMIT_DELAY = 1
 MIN_WEEKS_THRESHOLD = 3
@@ -108,66 +114,15 @@ def _pct_diff(close: float, ema_value: float) -> float:
     return round((close - ema_value) / ema_value * 100, 2)
 
 
-def _above_entry(symbol: str, name: str, close: float, ema_value: float, count: int) -> dict:
+def _entry(symbol: str, name: str, close: float, ema_val: float, val: int, key: str, is_above: bool) -> dict:
     return {
         "symbol": symbol,
         "name": name,
         "close": close,
-        "ema": round(ema_value, 4),
-        "pctAbove": _pct_diff(close, ema_value),
-        "count": count,
+        "ema": round(ema_val, 4),
+        "pctAbove" if is_above else "pctBelow": _pct_diff(close, ema_val) if is_above else _pct_diff(ema_val, close),
+        key: val,
     }
-
-
-def _below_entry(symbol: str, name: str, close: float, ema_value: float, count: int) -> dict:
-    return {
-        "symbol": symbol,
-        "name": name,
-        "close": close,
-        "ema": round(ema_value, 4),
-        "pctBelow": _pct_diff(ema_value, close),
-        "count": count,
-    }
-
-
-def _crossover_entry(symbol: str, name: str, close: float, ema_value: float, periods_below: int, period_key: str) -> dict:
-    return {
-        "symbol": symbol,
-        "name": name,
-        "close": close,
-        "ema": round(ema_value, 4),
-        "pctAbove": _pct_diff(close, ema_value),
-        period_key: periods_below,
-    }
-
-
-def _crossdown_entry(symbol: str, name: str, close: float, ema_value: float, periods_above: int, period_key: str) -> dict:
-    return {
-        "symbol": symbol,
-        "name": name,
-        "close": close,
-        "ema": round(ema_value, 4),
-        "pctBelow": _pct_diff(ema_value, close),
-        period_key: periods_above,
-    }
-
-
-def _append_timeframe_results(
-    batch: BatchResult,
-    result: dict[str, Optional[dict]],
-    cross_up_attr: str,
-    cross_down_attr: str,
-    below_attr: str,
-    above_attr: str,
-) -> None:
-    if result["crossover"] is not None:
-        getattr(batch, cross_up_attr).append(result["crossover"])
-    if result["crossdown"] is not None:
-        getattr(batch, cross_down_attr).append(result["crossdown"])
-    if result["below"] is not None:
-        getattr(batch, below_attr).append(result["below"])
-    if result["above"] is not None:
-        getattr(batch, above_attr).append(result["above"])
 
 
 def _process_batch(
@@ -200,15 +155,9 @@ def _process_batch(
         _append_timeframe_results(batch, quarterly, "quarter_crossovers", "quarter_crossdowns", "quarter_below", "quarter_above")
 
         if daily_result is not None:
-            forward_pe, pe_history = yahoo.fetch_forward_pe(symbol)
-            q_closes = weekly_result[0] if weekly_result is not None else None
-            computed = stats.compute_stats(
-                daily_result[0], daily_result[1],
-                vix_spikes=vix_spikes,
-                forward_pe=forward_pe,
-                forward_pe_history=pe_history,
-                weekly_closes=q_closes,
-            )
+            forward_pe, pe_hist = yahoo.fetch_forward_pe(symbol)
+            w_closes = weekly_result[0] if weekly_result is not None else None
+            computed = stats.compute_stats(daily_result[0], daily_result[1], vix_spikes=vix_spikes, forward_pe=forward_pe, forward_pe_history=pe_hist, weekly_closes=w_closes)
             if computed is not None:
                 computed.update({"symbol": symbol, "name": name})
                 _add_special_stats(symbol, computed, daily_result, weekly_result)
@@ -223,7 +172,7 @@ def _add_special_stats(symbol: str, computed: dict, daily_result: tuple, weekly_
         if election is not None: computed["spxSinceElection"] = election
         inauguration = stats.compute_return_since(daily_result[0], daily_result[1], 2025, 1, 20)
         if inauguration is not None: computed["spxSinceInauguration"] = inauguration
-    
+
     if symbol in _5Y_RETURN_SYMBOLS and weekly_result is not None:
         ret = stats.compute_return_since(weekly_result[0], weekly_result[1], 2021, 3, 28)
         if ret is not None: computed["return5Y"] = ret
@@ -246,79 +195,76 @@ def _process_timeframe(
     closes, timestamps = _strip_incomplete_week(candle_result[0], candle_result[1])
     if aggregate_fn is not None:
         closes = aggregate_fn(closes, timestamps)
-    
+
     ema_value = ema.calculate(closes)
     if ema_value is None:
         return empty
-    
+
     last_close = closes[-1]
     res = empty.copy()
 
     if (p_below := ema.detect_weekly_crossover(closes)) is not None:
-        res["crossover"] = _crossover_entry(symbol, name, last_close, ema_value, p_below, cross_up_key)
+        res["crossover"] = _entry(symbol, name, last_close, ema_value, p_below, cross_up_key, True)
 
     if (p_above := ema.detect_weekly_crossdown(closes)) is not None:
-        res["crossdown"] = _crossdown_entry(symbol, name, last_close, ema_value, p_above, cross_down_key)
+        res["crossdown"] = _entry(symbol, name, last_close, ema_value, p_above, cross_down_key, False)
 
     if (b_count := ema.count_periods_below(closes)) is not None and b_count >= min_below:
-        res["below"] = _below_entry(symbol, name, last_close, ema_value, b_count)
+        res["below"] = _entry(symbol, name, last_close, ema_value, b_count, "count", False)
 
     if (a_count := ema.count_periods_above(closes)) is not None:
-        res["above"] = _above_entry(symbol, name, last_close, ema_value, a_count)
+        res["above"] = _entry(symbol, name, last_close, ema_value, a_count, "count", True)
 
     return res
 
 
-def _write_batch_results(
-    bucket: str,
-    run_id: str,
-    batch_index: int,
-    symbol_count: int,
-    error_count: int,
+def _append_timeframe_results(
     batch: BatchResult,
+    result: dict[str, Optional[dict]],
+    cross_up_attr: str,
+    cross_down_attr: str,
+    below_attr: str,
+    above_attr: str,
 ) -> None:
+    if result["crossover"] is not None:
+        getattr(batch, cross_up_attr).append(result["crossover"])
+    if result["crossdown"] is not None:
+        getattr(batch, cross_down_attr).append(result["crossdown"])
+    if result["below"] is not None:
+        getattr(batch, below_attr).append(result["below"])
+    if result["above"] is not None:
+        getattr(batch, above_attr).append(result["above"])
+
+
+def _write_batch_results(bucket: str, run_id: str, idx: int, count: int, err_count: int, batch: BatchResult) -> None:
     body = {
-        "batchIndex": batch_index,
-        "symbolsProcessed": symbol_count,
-        "errors": error_count,
-        "errorDetails": batch.errors,
-        "crossovers": batch.crossovers,
-        "crossdowns": batch.crossdowns,
-        "weekBelow": batch.week_below,
-        "weekAbove": batch.week_above,
-        "monthCrossovers": batch.month_crossovers,
-        "monthCrossdowns": batch.month_crossdowns,
-        "monthBelow": batch.month_below,
-        "monthAbove": batch.month_above,
-        "quarterCrossovers": batch.quarter_crossovers,
-        "quarterCrossdowns": batch.quarter_crossdowns,
-        "quarterBelow": batch.quarter_below,
-        "quarterAbove": batch.quarter_above,
+        "batchIndex": idx, "symbolsProcessed": count, "errors": err_count, "errorDetails": batch.errors,
+        "crossovers": batch.crossovers, "crossdowns": batch.crossdowns, "weekBelow": batch.week_below, "weekAbove": batch.week_above,
+        "monthCrossovers": batch.month_crossovers, "monthCrossdowns": batch.month_crossdowns, "monthBelow": batch.month_below, "monthAbove": batch.month_above,
+        "quarterCrossovers": batch.quarter_crossovers, "quarterCrossdowns": batch.quarter_crossdowns, "quarterBelow": batch.quarter_below, "quarterAbove": batch.quarter_above,
         "stats": batch.stats_data,
     }
-    key = f"batches/{run_id}/batch-{batch_index:03d}.json"
-    s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(body))
+    _put_json(bucket, f"batches/{run_id}/batch-{idx:03d}.json", body)
 
 
 def _write_errors(bucket: str, run_id: str, batch_index: int, errors: list[dict]) -> None:
-    key = f"logs/{run_id}/errors-{batch_index:03d}.json"
-    s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(errors))
+    _put_json(bucket, f"logs/{run_id}/errors-{batch_index:03d}.json", errors)
 
 
-_AGGREGATE_KEYS = [
-    ("crossovers", "weeksBelow"),
-    ("crossdowns", "weeksAbove"),
-    ("weekBelow", "count"),
-    ("weekAbove", "count"),
-    ("monthCrossovers", "monthsBelow"),
-    ("monthCrossdowns", "monthsAbove"),
-    ("monthBelow", "count"),
-    ("monthAbove", "count"),
-    ("quarterCrossovers", "quartersBelow"),
-    ("quarterCrossdowns", "quartersAbove"),
-    ("quarterBelow", "count"),
-    ("quarterAbove", "count"),
-]
+def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
+    """Check if all batch result files exist in S3."""
+    return len(storage.list_objects(bucket, f"batches/{run_id}/")) >= total_batches
+
+
+def _aggregate_results(bucket: str, run_id: str, total_batches: int, *, snapshot: bool = False) -> None:
+    _aggregate_and_finalize(bucket, run_id, total_batches, snapshot=snapshot)
+
+
+def _aggregate_and_finalize(bucket: str, run_id: str, total: int, *, snapshot: bool = False) -> None:
+    batch_data = [_read_json(bucket, f"batches/{run_id}/batch-{i:03d}.json") for i in range(total)]
+    aggregated, total_symbols, total_errors = aggregator.aggregate_batches(batch_data)
+    _write_results(bucket, aggregated, total_symbols, total_errors, snapshot=snapshot)
+
 
 _RESULT_FILES = [
     ("", {"crossovers"}),
@@ -332,113 +278,50 @@ _RESULT_FILES = [
 ]
 
 
-def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
-    """Check if all batch result files exist in S3."""
-    prefix = f"batches/{run_id}/"
-    try:
-        resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        return resp.get("KeyCount", 0) >= total_batches
-    except Exception as err:
-        print(f"[worker] failed to list batches: {err}")
-        return False
-
-
-def _aggregate_results(bucket: str, run_id: str, total_batches: int, *, snapshot: bool = False) -> None:
-    aggregated, total_symbols, total_errors = _read_batches(bucket, run_id, total_batches)
-    _sort_aggregated(aggregated)
-    _write_results(bucket, aggregated, total_symbols, total_errors, snapshot=snapshot)
-
-
-def _read_batches(
-    bucket: str, run_id: str, total_batches: int,
-) -> tuple[dict[str, list[dict]], int, int]:
-    aggregated: dict[str, list[dict]] = {key: [] for key, _ in _AGGREGATE_KEYS}
-    aggregated.update({"stats": [], "errorDetails": []})
-    total_symbols = 0
-    total_errors = 0
-
-    for i in range(total_batches):
-        key = f"batches/{run_id}/batch-{i:03d}.json"
-        batch = _read_json(bucket, key)
-        if batch is None:
-            continue
-        for json_key, _ in _AGGREGATE_KEYS:
-            aggregated[json_key].extend(batch.get(json_key, []))
-        aggregated["stats"].extend(batch.get("stats", []))
-        aggregated["errorDetails"].extend(batch.get("errorDetails", []))
-        total_symbols += batch.get("symbolsProcessed", 0)
-        total_errors += batch.get("errors", 0)
-
-    return aggregated, total_symbols, total_errors
-
-
-def _sort_aggregated(aggregated: dict[str, list[dict]]) -> None:
-    for json_key, sort_field in _AGGREGATE_KEYS:
-        aggregated[json_key].sort(key=lambda x, f=sort_field: x.get(f, 0), reverse=True)
-
-
-def _write_results(
-    bucket: str, aggregated: dict[str, list[dict]], total_symbols: int, total_errors: int,
-    *, snapshot: bool = False,
-) -> None:
+def _write_results(bucket: str, agg: dict, total_sym: int, total_err: int, *, snapshot: bool = False) -> None:
     now = datetime.now(timezone.utc)
     scan_date = now.strftime("%Y-%m-%d")
-    base = {
-        "scanDate": scan_date,
-        "scanTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "symbolsScanned": total_symbols,
-        "errors": total_errors,
-    }
+    base = {"scanDate": scan_date, "scanTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "symbolsScanned": total_sym, "errors": total_err}
 
     for suffix, keys in _RESULT_FILES:
-        res = {**base, **{k: aggregated[k] for k in keys}}
+        res = {**base, **{k: agg[k] for k in keys}}
         _put_json(bucket, f"results/latest{suffix}.json", res)
         if snapshot:
             _put_json(bucket, f"results/{scan_date}{suffix}.json", res)
 
-    aggregated["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
-    _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": aggregated["errorDetails"]})
+    agg["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
+    _put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": agg["errorDetails"]})
 
-    aggregated["stats"].sort(key=lambda x: x.get("symbol", ""))
-    misc = _compute_misc_stats(aggregated["stats"], len(aggregated["weekAbove"]), total_symbols)
-    stats_result = {**base, "stats": aggregated["stats"], "misc": misc}
-    _put_json(bucket, "results/latest-stats.json", stats_result)
+    agg["stats"].sort(key=lambda x: x.get("symbol", ""))
+    misc = _compute_misc_stats(agg["stats"], len(agg["weekAbove"]), total_sym)
+    stats_res = {**base, "stats": agg["stats"], "misc": misc}
+    _put_json(bucket, "results/latest-stats.json", stats_res)
 
     if snapshot:
-        _put_json(bucket, f"results/{scan_date}-stats.json", stats_result)
+        _put_json(bucket, f"results/{scan_date}-stats.json", stats_res)
         _update_manifest(bucket, scan_date)
 
 
-def _compute_misc_stats(
-    all_stats: list[dict],
-    week_above_count: int = 0,
-    total_symbols: int = 0,
-) -> dict:
-    """Compute aggregate misc stats from all symbol stats."""
-    if not all_stats:
-        return {}
-
+def _compute_misc_stats(all_stats: list[dict], week_above_count: int = 0, total_symbols: int = 0) -> dict:
+    if not all_stats: return {}
     total = len(all_stats)
     h_pcts = [s["highPct"] for s in all_stats if "highPct" in s]
     y_pcts = [s["ytdPct"] for s in all_stats if "ytdPct" in s]
     f_pes = [s["forwardPE"] for s in all_stats if "forwardPE" in s]
 
     misc: dict = {}
-
-    if h_pcts and total > 0:
+    if h_pcts and total:
         misc["pctWithin5OfHigh"] = round(sum(1 for h in h_pcts if h >= -5) / total * 100, 1)
-
-    if y_pcts and total > 0:
+    if y_pcts and total:
         misc["pctPositiveYTD"] = round(sum(1 for y in y_pcts if y >= 0) / total * 100, 1)
         misc["avgYTD"] = round(sum(y_pcts) / len(y_pcts), 2)
-
     if f_pes:
         misc["avgForwardPE"] = round(sum(f_pes) / len(f_pes), 2)
         sorted_pes = sorted(f_pes)
         mid = len(sorted_pes) // 2
         misc["medianForwardPE"] = round((sorted_pes[mid-1] + sorted_pes[mid]) / 2 if len(sorted_pes) % 2 == 0 else sorted_pes[mid], 2)
 
-    if total_symbols > 0:
+    if total_symbols:
         misc["pctAbove5wkEMA"] = round(week_above_count / total_symbols * 100, 1)
         misc["pctBelow5wkEMA"] = round((total_symbols - week_above_count) / total_symbols * 100, 1)
 
@@ -454,8 +337,7 @@ def _compute_misc_stats(
 
     for sym in ("SPY", "QQQ", "DIA", "IWM", "TMUS"):
         entry = next((s for s in all_stats if s.get("symbol") == sym), None)
-        if entry and "return5Y" in entry:
-            misc[f"{sym.lower()}5Y"] = entry["return5Y"]
+        if entry and "return5Y" in entry: misc[f"{sym.lower()}5Y"] = entry["return5Y"]
 
     return misc
 
@@ -463,11 +345,9 @@ def _compute_misc_stats(
 def _update_manifest(bucket: str, scan_date: str) -> None:
     manifest = _read_json(bucket, "results/manifest.json") or {"weeks": []}
     weeks: list[str] = manifest.get("weeks", [])
-
-    if scan_date in weeks:
-        weeks.remove(scan_date)
+    if scan_date in weeks: weeks.remove(scan_date)
     weeks.insert(0, scan_date)
-
+    
     trimmed = weeks[MAX_WEEKLY_SNAPSHOTS:]
     weeks = weeks[:MAX_WEEKLY_SNAPSHOTS]
 
@@ -480,36 +360,11 @@ def _update_manifest(bucket: str, scan_date: str) -> None:
 def _delete_snapshot(bucket: str, scan_date: str) -> None:
     suffixes = ["", "-crossdown", "-below", "-above", "-monthly", "-monthly-below-above", "-quarterly", "-quarterly-below-above", "-stats"]
     for suffix in suffixes:
-        key = f"results/{scan_date}{suffix}.json"
-        try:
-            s3.delete_object(Bucket=bucket, Key=key)
-        except Exception as err:
-            print(f"[worker] failed to delete s3://{bucket}/{key}: {err}")
-
-
-def _read_json(bucket: str, key: str) -> Any:
-    try:
-        resp = s3.get_object(Bucket=bucket, Key=key)
-        return json.loads(resp["Body"].read())
-    except Exception as err:
-        print(f"[worker] failed to read s3://{bucket}/{key}: {err}")
-        return None
-
-
-def _put_json(bucket: str, key: str, data: Any) -> None:
-    s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(data))
+        storage.delete_object(bucket, f"results/{scan_date}{suffix}.json")
 
 
 def _invalidate_cache() -> None:
     dist_id = os.environ.get("DISTRIBUTION_ID")
-    if not dist_id:
-        print("[worker] DISTRIBUTION_ID not set, skipping cache invalidation")
-        return
-    cloudfront.create_invalidation(
-        DistributionId=dist_id,
-        InvalidationBatch={
-            "Paths": {"Quantity": 1, "Items": ["/results/*"]},
-            "CallerReference": datetime.now(timezone.utc).isoformat(),
-        },
-    )
-    print(f"[worker] CloudFront invalidation created for {dist_id}")
+    if dist_id:
+        storage.invalidate_cache(dist_id, ["/results/*"])
+        print(f"[worker] CloudFront invalidation created for {dist_id}")
