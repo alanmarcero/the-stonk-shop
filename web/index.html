@@ -1097,6 +1097,8 @@ const state = {
   dynPEPrevCol: {},
   tabCountCache: {},
   showAllRows: false,
+  isScanning: false,
+  latestJson: null,
 };
 
 function debounce(fn, delay) {
@@ -1814,9 +1816,14 @@ function enrichRows(rows, t) {
 /* ── Meta ── */
 
 async function renderMeta(json) {
-  const t = json.scanTime ? new Date(json.scanTime).toLocaleString() : '\u2014';
-  const scanned = (json.symbolsScanned || 0).toLocaleString();
-  const errs = json.errors || 0;
+  if (json) state.latestJson = json;
+  const currentJson = state.latestJson || {};
+  
+  const timestamp = currentJson.scanTime ? new Date(currentJson.scanTime).toLocaleString() : '\u2014';
+  const updatedText = state.isScanning ? '<strong style="color:var(--accent)">Scan in Progress</strong>' : `<strong>${timestamp}</strong>`;
+  
+  const scanned = (currentJson.symbolsScanned || 0).toLocaleString();
+  const errs = currentJson.errors || 0;
 
   let total = '';
   try {
@@ -1831,7 +1838,7 @@ async function renderMeta(json) {
 
   const errStyle = errs ? ' style="color:var(--red)"' : '';
   document.getElementById('meta').innerHTML =
-    `<span class="meta">Updated <strong>${t}</strong></span>` +
+    `<span class="meta">Updated ${updatedText}</span>` +
     `<span class="meta-sep">|</span>` +
     `<span class="meta"><a href="/symbols/us-equities.txt" target="_blank" class="meta-link">${scanned}${total} symbols</a></span>` +
     `<span class="meta-sep">|</span>` +
@@ -1953,6 +1960,7 @@ function showMiscStats() {
     { label: 'Above 200W SMA', value: misc.pctAbove200wSMA != null ? misc.pctAbove200wSMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove200wSMA != null ? 'var(--green)' : null },
     { label: 'SPX Since Election', value: misc.spxSinceElection != null ? (misc.spxSinceElection > 0 ? '+' : '') + misc.spxSinceElection.toFixed(2) + '%' : '\u2014', color: misc.spxSinceElection != null ? (misc.spxSinceElection >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'SPX Since Inauguration', value: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration > 0 ? '+' : '') + misc.spxSinceInauguration.toFixed(2) + '%' : '\u2014', color: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration >= 0 ? 'var(--green)' : 'var(--red)') : null },
+    { label: 'SPY Since ChatGPT', value: misc.spySinceChatGPT != null ? (misc.spySinceChatGPT > 0 ? '+' : '') + misc.spySinceChatGPT.toFixed(2) + '%' : '\u2014', color: misc.spySinceChatGPT != null ? (misc.spySinceChatGPT >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'SPY 5Y', value: misc.spy5Y != null ? (misc.spy5Y > 0 ? '+' : '') + misc.spy5Y.toFixed(2) + '%' : '\u2014', color: misc.spy5Y != null ? (misc.spy5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'QQQ 5Y', value: misc.qqq5Y != null ? (misc.qqq5Y > 0 ? '+' : '') + misc.qqq5Y.toFixed(2) + '%' : '\u2014', color: misc.qqq5Y != null ? (misc.qqq5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'DIA 5Y', value: misc.dia5Y != null ? (misc.dia5Y > 0 ? '+' : '') + misc.dia5Y.toFixed(2) + '%' : '\u2014', color: misc.dia5Y != null ? (misc.dia5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
@@ -2107,6 +2115,13 @@ async function fetchAll(isSilentRefresh = false) {
       const res = await fetch('__ORCHESTRATOR_URL__?dev_key=__DEV_KEY__', { method: 'GET' });
       if (res.ok) {
         const data = await res.json();
+        const wasScanning = state.isScanning;
+        state.isScanning = data.running;
+        
+        if (state.isScanning !== wasScanning) {
+          renderMeta();
+        }
+
         if (data.running) {
           btn.textContent = 'Scan in Progress';
           btn.disabled = true;

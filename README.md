@@ -20,7 +20,7 @@ EventBridge (Scheduler) → Orchestrator Lambda → SQS → Worker Lambda → S3
 - **VIX Spike Correlation** — Returns since major market volatility events.
 - **Swing Levels** — Breakout/breakdown price levels with historical date tracking.
 - **Interactive Dashboard** — Responsive web UI with real-time scan status, sorting, and multi-source filtering.
-- **On-Demand Scans** — Secure "Run Now" trigger protected by a `DEV_KEY` and origin-restricted CORS.
+- **On-Demand Scans** — Secure "Run Now" trigger protected by origin-restricted CORS.
 
 ## Project Structure
 
@@ -28,7 +28,7 @@ EventBridge (Scheduler) → Orchestrator Lambda → SQS → Worker Lambda → S3
 src/
   orchestrator/    # Fan-out with SQS batching
   worker/          # Analysis engine: EMA, RSI, swing, quarterly, VIX, stats
-tests/             # 340 tests (100% pass)
+tests/             # 233 tests (100% pass)
 web/               # Single-page dashboard (index.html)
 terraform/         # IaC: S3 OAC, CloudFront, Lambda URLs, IAM
 scripts/           # Diagnostic and maintenance utilities
@@ -45,23 +45,13 @@ python3 -m pytest tests/ -v
 aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 ```
 
-**AWS CLI:** Profile `scanner` configured locally for the `alanmarcero` IAM user.
-
 ## Deployment
 
 **GitHub Actions:** Automatically triggered on push to `main`.
-1.  **Test:** Executes 340 unit tests via `pytest`.
+1.  **Test:** Executes 233 unit tests via `pytest`.
 2.  **Infrastructure:** Applies Terraform changes (IAM, Lambda, SQS, S3).
-3.  **App:** Injects `ORCHESTRATOR_URL` and `DEV_KEY` into `index.html` and deploys to S3.
+3.  **App:** Injects `ORCHESTRATOR_URL` into `index.html` and deploys to S3.
 4.  **CDN:** Invalidates CloudFront cache for instant updates.
-
-**Required Secrets:**
-- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
-- `DEV_KEY` — Secure token for on-demand scan triggers.
-
-## Related Repos
-
-- **[StockTicker-macOS](https://github.com/alanmarcero/StockTicker-macOS)** — macOS menu bar app that consumes this scanner's CloudFront API via `ScannerService`.
 
 ## License
 

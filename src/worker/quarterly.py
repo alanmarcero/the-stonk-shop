@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-
 QUARTER_END_MONTHS = {3, 6, 9, 12}
 
 
@@ -21,27 +20,16 @@ def compute_quarterly_changes(
         return None
 
     current_close = closes[-1]
-
     since_quarter = {}
     during_quarter = {}
 
     for i, qe in enumerate(quarter_ends):
         label = qe["label"]
-        if qe["close"] > 0:
-            since_quarter[label] = round(
-                (current_close - qe["close"]) / qe["close"] * 100, 2
-            )
-        else:
-            since_quarter[label] = 0.0
+        since_quarter[label] = round((current_close - qe["close"]) / qe["close"] * 100, 2) if qe["close"] > 0 else 0.0
 
         if i > 0:
             prev_close = quarter_ends[i - 1]["close"]
-            if prev_close > 0:
-                during_quarter[label] = round(
-                    (qe["close"] - prev_close) / prev_close * 100, 2
-                )
-            else:
-                during_quarter[label] = 0.0
+            during_quarter[label] = round((qe["close"] - prev_close) / prev_close * 100, 2) if prev_close > 0 else 0.0
 
     return {"sinceQuarter": since_quarter, "duringQuarter": during_quarter}
 
@@ -55,27 +43,20 @@ def _extract_quarter_ends(
     for close, ts in zip(closes, timestamps):
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
         if dt.month in QUARTER_END_MONTHS:
-            key = (dt.year, dt.month)
-            monthly_last[key] = (close, ts)
+            monthly_last[(dt.year, dt.month)] = (close, ts)
 
     # Don't include current quarter-end if it's still in progress
-    now_ts = timestamps[-1]
-    now_dt = datetime.fromtimestamp(now_ts, tz=timezone.utc)
-    current_key = (now_dt.year, now_dt.month)
+    now_dt = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc)
     if now_dt.month in QUARTER_END_MONTHS:
-        # Only exclude if we're still in the quarter-end month
-        monthly_last.pop(current_key, None)
+        monthly_last.pop((now_dt.year, now_dt.month), None)
 
-    result = []
-    for (year, month), (close, ts) in sorted(monthly_last.items()):
-        quarter = _quarter_label(month, year)
-        result.append({"label": quarter, "close": close, "ts": ts})
-
-    return result
+    return [
+        {"label": _quarter_label(month, year), "close": close, "ts": ts}
+        for (year, month), (close, ts) in sorted(monthly_last.items())
+    ]
 
 
 def _quarter_label(month: int, year: int) -> str:
     """Format quarter label like Q4'25."""
     quarter_num = {3: 1, 6: 2, 9: 3, 12: 4}[month]
-    short_year = str(year)[-2:]
-    return f"Q{quarter_num}'{short_year}"
+    return f"Q{quarter_num}'{str(year)[-2:]}"

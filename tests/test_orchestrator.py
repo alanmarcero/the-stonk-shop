@@ -1,69 +1,66 @@
 import json
+import os
 from io import BytesIO
 from unittest.mock import patch, MagicMock
+import pytest
 
 from src.orchestrator.app import lambda_handler, _detect_vix_spikes, _fetch_vix_spikes, BATCH_SIZE
 
 
-class TestLambdaHandler:
-
-    def setup_method(self):
-        self._env_patcher = patch.dict(
-            "os.environ", {"BUCKET_NAME": "test-bucket", "QUEUE_URL": "https://sqs.test/queue"}
-        )
-        self._s3_patcher = patch("src.orchestrator.app.s3")
-        self._sqs_patcher = patch("src.orchestrator.app.sqs")
-        self._vix_patcher = patch("src.orchestrator.app._fetch_vix_spikes")
-        self._env_patcher.start()
-        self.mock_s3 = self._s3_patcher.start()
-        self.mock_sqs = self._sqs_patcher.start()
-        self.mock_sqs.get_queue_attributes.return_value = {
+@pytest.fixture
+def mock_orchestrator_deps():
+    with patch.dict("os.environ", {"BUCKET_NAME": "test-bucket", "QUEUE_URL": "https://sqs.test/queue"}), \
+         patch("src.orchestrator.app.s3") as mock_s3, \
+         patch("src.orchestrator.app.sqs") as mock_sqs, \
+         patch("src.orchestrator.app._fetch_vix_spikes") as mock_vix:
+        
+        mock_sqs.get_queue_attributes.return_value = {
             "Attributes": {
                 "ApproximateNumberOfMessages": "0",
                 "ApproximateNumberOfMessagesNotVisible": "0",
                 "ApproximateNumberOfMessagesDelayed": "0",
             }
         }
-        self.mock_vix = self._vix_patcher.start()
-        self.mock_vix.return_value = []
+        mock_vix.return_value = []
+        yield mock_s3, mock_sqs, mock_vix
 
-    def teardown_method(self):
-        self._vix_patcher.stop()
-        self._sqs_patcher.stop()
-        self._s3_patcher.stop()
-        self._env_patcher.stop()
 
-    def _make_s3_response(self, symbols: list[str]) -> dict:
-        body = "\n".join(symbols).encode("utf-8")
-        return {"Body": BytesIO(body)}
+def _make_s3_response(symbols: list[str]) -> dict:
+    body = "\n".join(symbols).encode("utf-8")
+    return {"Body": BytesIO(body)}
 
-    def test_reads_symbols_from_s3(self):
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL", "MSFT"])
+
+class TestLambdaHandler:
+
+    def test_reads_symbols_from_s3(self, mock_orchestrator_deps):
+        mock_s3, _, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL", "MSFT"])
 
         lambda_handler({}, None)
 
-        self.mock_s3.get_object.assert_called_once_with(
+        mock_s3.get_object.assert_called_once_with(
             Bucket="test-bucket", Key="symbols/us-equities.txt"
         )
 
-    def test_sends_correct_batch_count(self):
+    def test_sends_correct_batch_count(self, mock_orchestrator_deps):
+        _, mock_sqs, _ = mock_orchestrator_deps
         symbols = [f"SYM{i}" for i in range(120)] # 120 / 25 = 5 batches
-        self.mock_s3.get_object.return_value = self._make_s3_response(symbols)
+        mock_orchestrator_deps[0].get_object.return_value = _make_s3_response(symbols)
 
         lambda_handler({}, None)
 
         # 5 batches sent in 1 SQS batch call (max 10 per call)
-        assert self.mock_sqs.send_message_batch.call_count == 1
-        assert len(self.mock_sqs.send_message_batch.call_args[1]["Entries"]) == 5
+        assert mock_sqs.send_message_batch.call_count == 1
+        assert len(mock_sqs.send_message_batch.call_args[1]["Entries"]) == 5
 
-    def test_batch_message_structure(self):
+    def test_batch_message_structure(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, _ = mock_orchestrator_deps
         symbols = [f"SYM{i}" for i in range(60)] # 3 batches
-        self.mock_s3.get_object.return_value = self._make_s3_response(symbols)
+        mock_s3.get_object.return_value = _make_s3_response(symbols)
 
         lambda_handler({}, None)
 
-        first_sqs_batch = self.mock_sqs.send_message_batch.call_args_list[0]
-        entries = first_sqs_batch[1]["Entries"]
+        entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         assert len(entries) == 3
         
         body = json.loads(entries[0]["MessageBody"])
@@ -77,99 +74,110 @@ class TestLambdaHandler:
         assert body2["totalBatches"] == 3
         assert len(body2["symbols"]) == 25
 
-    def test_sends_to_correct_queue_url(self):
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+    def test_sends_to_correct_queue_url(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         lambda_handler({}, None)
 
-        assert self.mock_sqs.send_message_batch.call_args[1]["QueueUrl"] == "https://sqs.test/queue"
+        assert mock_sqs.send_message_batch.call_args[1]["QueueUrl"] == "https://sqs.test/queue"
 
-    def test_returns_summary(self):
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL", "MSFT", "GOOG"])
+    def test_returns_summary(self, mock_orchestrator_deps):
+        mock_s3, _, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL", "MSFT", "GOOG"])
 
         result = lambda_handler({}, None)
 
         assert result["statusCode"] == 200
-        assert json.loads(result["body"])["totalSymbols"] == 3
-        assert json.loads(result["body"])["totalBatches"] == 1
-        assert "runId" in json.loads(result["body"])
+        body = json.loads(result["body"])
+        assert body["totalSymbols"] == 3
+        assert body["totalBatches"] == 1
+        assert "runId" in body
 
-    def test_strips_whitespace_and_skips_empty_lines(self):
+    def test_strips_whitespace_and_skips_empty_lines(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, _ = mock_orchestrator_deps
         body = b"  AAPL  \n\n  MSFT \n\n\n  GOOG  \n"
-        self.mock_s3.get_object.return_value = {"Body": BytesIO(body)}
+        mock_s3.get_object.return_value = {"Body": BytesIO(body)}
 
         result = lambda_handler({}, None)
 
         assert json.loads(result["body"])["totalSymbols"] == 3
-        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body_sent = json.loads(entries[0]["MessageBody"])
         assert body_sent["symbols"] == ["AAPL", "MSFT", "GOOG"]
 
-    def test_run_id_is_date_format(self):
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+    def test_run_id_is_date_format(self, mock_orchestrator_deps):
+        mock_s3, _, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         result = lambda_handler({}, None)
 
         import re
         assert re.match(r"\d{4}-\d{2}-\d{2}", json.loads(result["body"])["runId"])
 
-    def test_exactly_batch_size_symbols(self):
+    def test_exactly_batch_size_symbols(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, _ = mock_orchestrator_deps
         symbols = [f"SYM{i}" for i in range(25)]
-        self.mock_s3.get_object.return_value = self._make_s3_response(symbols)
+        mock_s3.get_object.return_value = _make_s3_response(symbols)
 
         result = lambda_handler({}, None)
 
         assert json.loads(result["body"])["totalBatches"] == 1
-        assert self.mock_sqs.send_message_batch.call_count == 1
+        assert mock_sqs.send_message_batch.call_count == 1
 
-    def test_single_symbol(self):
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+    def test_single_symbol(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         result = lambda_handler({}, None)
 
         assert json.loads(result["body"])["totalBatches"] == 1
-        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body_sent = json.loads(entries[0]["MessageBody"])
         assert body_sent["symbols"] == ["AAPL"]
         assert body_sent["totalBatches"] == 1
 
-    def test_message_has_no_sneak_peek(self):
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+    def test_message_has_no_sneak_peek(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         lambda_handler({}, None)
 
-        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body = json.loads(entries[0]["MessageBody"])
         assert "sneakPeek" not in body
 
-    def test_includes_vix_spikes_in_message(self):
+    def test_includes_vix_spikes_in_message(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, mock_vix = mock_orchestrator_deps
         spikes = [{"dateString": "3/10/25", "timestamp": 1000, "vixClose": 25.0}]
-        self.mock_vix.return_value = spikes
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+        mock_vix.return_value = spikes
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         lambda_handler({}, None)
 
-        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body = json.loads(entries[0]["MessageBody"])
         assert body["vixSpikes"] == spikes
 
-    def test_empty_vix_spikes_in_message(self):
-        self.mock_vix.return_value = []
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+    def test_empty_vix_spikes_in_message(self, mock_orchestrator_deps):
+        mock_s3, mock_sqs, mock_vix = mock_orchestrator_deps
+        mock_vix.return_value = []
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         lambda_handler({}, None)
 
-        entries = self.mock_sqs.send_message_batch.call_args[1]["Entries"]
+        entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body = json.loads(entries[0]["MessageBody"])
         assert body["vixSpikes"] == []
 
-    def test_return_includes_vix_spike_count(self):
+    def test_return_includes_vix_spike_count(self, mock_orchestrator_deps):
+        mock_s3, _, mock_vix = mock_orchestrator_deps
         spikes = [
             {"dateString": "3/10/25", "timestamp": 1000, "vixClose": 25.0},
             {"dateString": "8/5/25", "timestamp": 2000, "vixClose": 30.0},
         ]
-        self.mock_vix.return_value = spikes
-        self.mock_s3.get_object.return_value = self._make_s3_response(["AAPL"])
+        mock_vix.return_value = spikes
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
 
         result = lambda_handler({}, None)
 
@@ -178,8 +186,10 @@ class TestLambdaHandler:
 
 class TestBatchSize:
 
-    def test_batch_size_is_50(self):
+    def test_batch_size_is_25(self):
         assert BATCH_SIZE == 25
+
+
 class TestDetectVixSpikes:
 
     def test_no_spikes_below_threshold(self):
@@ -196,7 +206,6 @@ class TestDetectVixSpikes:
 
     def test_clusters_nearby_spikes(self):
         day = 86400
-        # Two spike clusters separated by 10 non-spike days (well beyond gap_days=5)
         closes = [25.0, 30.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 15.0, 28.0]
         timestamps = [day * i for i in range(13)]
         result = _detect_vix_spikes(closes, timestamps)
