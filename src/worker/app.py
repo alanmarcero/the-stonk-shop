@@ -63,9 +63,13 @@ def lambda_handler(event: dict, context: Any) -> dict:
             _write_errors(bucket, run_id, batch_index, result.errors)
 
         if _all_batches_complete(bucket, run_id, total_batches):
-            print(f"[worker] All {total_batches} batches complete. Aggregating.")
-            _aggregate_results(bucket, run_id, total_batches, snapshot=snapshot)
-            _invalidate_cache()
+            if _acquire_aggregation_lock(bucket, run_id):
+                print(f"[worker] All {total_batches} batches complete. Aggregating.")
+                _aggregate_results(bucket, run_id, total_batches, snapshot=snapshot)
+                if snapshot:
+                    _invalidate_cache()
+            else:
+                print(f"[worker] Aggregation already in progress or completed by another worker for run {run_id}")
 
     return {"statusCode": 200}
 
@@ -363,13 +367,37 @@ _RESULT_FILES = [
 
 def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
     """Check if all batch result files exist in S3."""
-    prefix = f"batches/{run_id}/"
+    prefix = f"batches/{run_id}/batch-"
     try:
+        # Use a more specific prefix to avoid matching the lock file if it's in the same folder
         resp = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
         count = resp.get("KeyCount", 0)
         return count >= total_batches
     except Exception as err:
         print(f"[worker] failed to list batches: {err}")
+        return False
+
+
+def _acquire_aggregation_lock(bucket: str, run_id: str) -> bool:
+    """Try to create a lock file in S3 to ensure only one worker aggregates results."""
+    lock_key = f"batches/{run_id}/aggregation.lock"
+    try:
+        # put_object with IfNoneMatch='*' is an atomic "create if not exists" in S3
+        s3.put_object(
+            Bucket=bucket,
+            Key=lock_key,
+            Body=json.dumps({"lockedAt": datetime.now(timezone.utc).isoformat()}),
+            IfNoneMatch="*"
+        )
+        return True
+    except s3.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] == "PreconditionFailed":
+            return False
+        # Log other S3 errors but treat as failed lock
+        print(f"[worker] S3 error acquiring lock for {run_id}: {e}")
+        return False
+    except Exception as e:
+        print(f"[worker] Unexpected error acquiring lock for {run_id}: {e}")
         return False
 
 
