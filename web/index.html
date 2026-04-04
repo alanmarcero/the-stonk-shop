@@ -949,6 +949,20 @@
     .stat-value { font-size: 18px; }
     .stat-label { font-size: 9px; }
   }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    min-width: 60px;
+  }
+  .status-above { background: var(--green-dim); color: var(--green); }
+  .status-below { background: var(--red-dim); color: var(--red); }
+  .status-neutral { background: var(--bg-elevated); color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -980,8 +994,11 @@
 
 <script>
 const MEGA_CAP = new Set(['AAPL','ABBV','ABT','ACN','ADBE','AMD','AMGN','AMZN','AVGO','AXP','BA','BAC','BRK-B','BX','CAT','CI','CMCSA','COP','COST','CRM','CRWD','CSCO','CVX','DE','DHR','DIS','ETN','GE','GEV','GILD','GOOG','GOOGL','GS','HD','HON','IBM','INTC','INTU','ISRG','JNJ','JPM','KO','LIN','LLY','LMT','LOW','MA','MCD','MDLZ','MRK','MS','MSFT','MU','NEE','NFLX','NKE','NOW','NVDA','ORCL','PEP','PFE','PG','PGR','PLTR','PM','PYPL','QCOM','RTX','SBUX','SCHW','SHW','SPGI','T','TJX','TMO','TMUS','TSLA','TXN','UNH','UNP','UPS','V','VRTX','VZ','WFC','WMT','XOM']);
+const MEGA_CAP_500B = new Set(['NVDA','AAPL','MSFT','AMZN','GOOGL','META','LLY','TSLA','BRK-B','AVGO','JPM','V','MA','COST','UNH','NFLX','WMT','ORCL','HD','ABBV','CRM','PFE','BAC','KO','PEP','TMUS','ADI','TMO','AMD','QCOM','LIN','ADBE','CSCO','NKE','GE','RTX','INTU','TXN','GEV','IBM','GS','AMGN','CAT','TJX','ISRG','BKNG','MU','PLTR','MS','HON','BX','AXP','SPGI','BLK','PM','ETN','REGN','SYK','CI','GILD','LMT','ADP','COP','CB','BSX','FI','MMC','MDLZ','KLAC','DE','VRTX','SCHW','AMT','UNP','ADI','PANW','ITW','HCA','PGR','SNPS','CDNS','MELI','CMG','MO','EMR']);
 
 const TOP_AUM = new Set(['SPY','IVV','VOO','VTI','QQQ','VEA','VTV','IEFA','BND','AGG','VWO','IWM','IEMG','VIG','VUG','IJR','VXUS','GLD','IJH','SCHD','VGT','XLK','BNDX','VO','IWF','VCIT','XLV','ITOT','BSV','DIA']);
+const ALL_ETFS = new Set(['AFK', 'AGG', 'AGGY', 'AIQ', 'AIVL', 'ANGL', 'ARGT', 'ARKF', 'ARKG', 'ARKK', 'ARKQ', 'ARKW', 'AUSF', 'BBH', 'BIL', 'BILS', 'BITQ', 'BIV', 'BIZD', 'BKCH', 'BLOK', 'BND', 'BNDX', 'BOTZ', 'BSV', 'BTCW', 'BUG', 'BWX', 'CATH', 'CHAT', 'CHIQ', 'CIBR', 'CLIP', 'CLOB', 'CLOI', 'CLOU', 'CNCR', 'COPX', 'CQQQ', 'CRAK', 'CWB', 'CWI', 'CXSE', 'DAPP', 'DAX', 'DBA', 'DBC', 'DDLS', 'DDWM', 'DEM', 'DES', 'DEW', 'DFE', 'DFEN', 'DFJ', 'DGRE', 'DGRS', 'DGRW', 'DGS', 'DHS', 'DIA', 'DIM', 'DIV', 'DJIA', 'DLN', 'DLS', 'DNL', 'DOL', 'DON', 'DRIV', 'DTCR', 'DTD', 'DTH', 'DWM', 'DXJ', 'EBND', 'EEM', 'EES', 'EINC', 'ELD', 'EMBD', 'EMBX', 'EMLC', 'EMMF', 'EPI', 'EPS', 'ESGV', 'ESPO', 'ETHA', 'ETHV', 'EZM', 'FAN', 'FDIS', 'FDN', 'FEZ', 'FHLC', 'FINX', 'FLRN', 'FLTR', 'FTEC', 'GDE', 'GDMN', 'GDX', 'GDXJ', 'GLD', 'GLDM', 'GLIN', 'GNR', 'GOEX', 'GPZ', 'GREK', 'GRID', 'GRNB', 'GXIG', 'HACK', 'HAP', 'HEDJ', 'HODL', 'HYD', 'HYEM', 'HYG', 'HYMB', 'HYZD', 'IBB', 'IBIT', 'ICLN', 'IEFA', 'IEMG', 'IFRA', 'IGV', 'IHDG', 'IHF', 'IHI', 'IJH', 'IJR', 'IQDG', 'ISRA', 'ITA', 'ITB', 'ITM', 'ITOT', 'IVV', 'IWF', 'IWM', 'IYE', 'IYF', 'IYH', 'IYR', 'IYT', 'IYW', 'IYZ', 'IZRL', 'JETS', 'JNK', 'KBE', 'KIE', 'KOMP', 'KRE', 'KRMA', 'KWEB', 'LIT', 'MAGS', 'MDY', 'MDYG', 'MDYV', 'METV', 'MGC', 'MGK', 'MGV', 'MJ', 'MLN', 'MLPA', 'MLPX', 'MOAT', 'MOO', 'MORT', 'MOTI', 'MSOS', 'NLR', 'NORW', 'NTSI', 'NTSX', 'OIH', 'ONLN', 'ONOF', 'OUNZ', 'PAVE', 'PBE', 'PBW', 'PFFD', 'PFFV', 'PFXF', 'PHO', 'PIT', 'PJP', 'PPH', 'PPLT', 'PRNT', 'PSCT', 'PSI', 'QCLN', 'QDTE', 'QGRW', 'QHY', 'QQQ', 'QQQJ', 'QTEC', 'QUS', 'QYLD', 'QYLG', 'RAAX', 'RDTE', 'REMX', 'ROBO', 'RSSL', 'RTH', 'RWR', 'RYLD', 'SCHD', 'SDIV', 'SDY', 'SHLD', 'SHM', 'SHYD', 'SIL', 'SJNK', 'SKYY', 'SLV', 'SLX', 'SLYG', 'SLYV', 'SMB', 'SMH', 'SMHX', 'SMOG', 'SMOT', 'SNSR', 'SOXQ', 'SOXX', 'SPAB', 'SPBO', 'SPDW', 'SPEM', 'SPFF', 'SPGM', 'SPHY', 'SPIB', 'SPLG', 'SPMB', 'SPMD', 'SPSB', 'SPSM', 'SPTI', 'SPTL', 'SPTM', 'SPTS', 'SPY', 'SPYD', 'SPYG', 'SPYV', 'SPYX', 'SRET', 'SRLN', 'TAN', 'TFI', 'TIPX', 'TOTL', 'UNG', 'UNIY', 'URA', 'URNM', 'USDU', 'USFR', 'USMF', 'USO', 'VB', 'VBK', 'VBR', 'VCIT', 'VCSH', 'VDC', 'VDE', 'VEA', 'VEU', 'VFH', 'VGIT', 'VGK', 'VGLT', 'VGSH', 'VGT', 'VHT', 'VIG', 'VIGI', 'VMBS', 'VNM', 'VNQ', 'VO', 'VOE', 'VONG', 'VONV', 'VOO', 'VOOG', 'VOT', 'VPL', 'VPU', 'VSS', 'VT', 'VTEB', 'VTI', 'VTIP', 'VTV', 'VTWO', 'VUG', 'VUSB', 'VV', 'VWO', 'VXF', 'VXUS', 'VYM', 'VYMI', 'WCLD', 'WOOD', 'WTAI', 'WTMF', 'WTV', 'XAR', 'XBI', 'XDTE', 'XHB', 'XHE', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XME', 'XMPT', 'XNTK', 'XOP', 'XPAY', 'XRT', 'XSD', 'XSOE', 'XSW', 'XYLD', 'YBTC', 'YOLO', 'ZAP']);
+const MAJOR_TARGETS = new Set([...INDEX_SYMBOLS, ...TOP_AUM, ...MEGA_CAP_500B]);
 const TOP_VOL = new Set(['SPY','QQQ','IWM','EEM','XLF','HYG','SMH','GDX','SLV','IBIT']);
 const SPDR = new Set(['SPY','GLD','SPLG','XLK','XLF','DIA','SPYG','BIL','XLV','XLE','SPDW','GLDM','SPYV','XLI','XLC','MDY','XLU','XLY','SDY','XLP','SPEM','SPMD','SPSM','SPTM','SPTL','SPIB','SPHY','SPTI','SPAB','SPSB','XBI','XLRE','JNK','SPYD','XLB','SPMB','XAR','SPTS','CWB','SRLN','FEZ','SJNK','GNR','XME','SLYV','SLYG','TOTL','BILS','KRE','SHM','TFI','HYMB','FLRN','MDYG','CWI','MDYV','XOP','KOMP','SPYX','EBND','SPBO','TIPX','RWR','XHB','XSD','BWX','QUS','XNTK','SPGM']);
 const VANGUARD = new Set(['VOO','VTI','VEA','VUG','VTV','BND','VXUS','VWO','VGT','VIG','VO','BNDX','VYM','VB','VCIT','VT','VEU','VV','BSV','VTEB','VCSH','VGIT','VONG','VNQ','VBR','VGK','MGK','BIV','VGSH','VXF','VOE','VOOG','VBK','VYMI','VOT','VHT','VONV','VTIP','VMBS','VTWO','VFH','MGV','VSS','ESGV','VGLT','MGC','VDE','VIGI','VPL','VPU','VDC','VUSB']);
@@ -1029,6 +1046,8 @@ const DEFAULT_FILTERS = {
 };
 
 const TAB_DEFS = [
+  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','name','close','ytdPct','wkStatus','moStatus','qtrStatus'] },
+  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','name','close','ytdPct','wkStatus','moStatus','qtrStatus'] },
   { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','name','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
   { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
   { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
@@ -1062,12 +1081,14 @@ const COL_LABELS = {
   breakoutPrice: 'Breakout', breakdownPrice: 'Breakdown',
   breakoutDate: 'Date', breakdownDate: 'Date',
   spikeClose: 'Spike Close', pctGain: '% Gain',
+  wkStatus: 'Wk EMA', moStatus: 'Mo EMA', qtrStatus: 'Qtr EMA',
 };
 
 const CROSS_UP_TABS = new Set(['crossovers', 'moCrossUp', 'qCrossUp']);
 const CROSS_DOWN_TABS = new Set(['crossdowns', 'moCrossDown', 'qCrossDown']);
 
 const TAB_GROUPS = [
+  { label: 'Dashboards', tabs: ['etfDashboard', 'megaDashboard'] },
   { label: 'Weekly',    tabs: ['crossovers', 'crossdowns', 'weekBelow', 'weekAbove'] },
   { label: 'Monthly',   tabs: ['moCrossUp', 'moCrossDown', 'moBelow', 'moAbove'] },
   { label: 'Quarterly', tabs: ['qCrossUp', 'qCrossDown', 'qBelow', 'qAbove'] },
@@ -1083,7 +1104,7 @@ const state = {
   activeSourceMode: 'all',
   data: {},
   statsMap: {},
-  activeTab: TAB_DEFS[0].id,
+  activeTab: 'etfDashboard',
   sortCol: null,
   sortAsc: true,
   filters: {},
@@ -1776,6 +1797,13 @@ function fmtNum(col, v) {
   return v.toLocaleString();
 }
 
+function formatStatus(status) {
+  if (!status || status.count == null) return '<div class="status-badge status-neutral">?</div>';
+  const cls = status.above ? 'status-above' : 'status-below';
+  const label = status.above ? 'Above' : 'Below';
+  return `<div class="status-badge ${cls}">${label} (${status.count})</div>`;
+}
+
 function esc(s) {
   const d = document.createElement('div');
   d.textContent = s;
@@ -1801,16 +1829,22 @@ function populateTabData(byUrl) {
 }
 
 function enrichRows(rows, t) {
-  return rows.map(r => ({
-    ...r,
-    name: r.name || state.statsMap[r.symbol]?.name || '',
-    pct: r[t.pctField] != null ? r[t.pctField] : null,
-    ytdPct: state.statsMap[r.symbol]?.ytdPct ?? null,
-    highPct: state.statsMap[r.symbol]?.highPct ?? null,
-    lowPct: state.statsMap[r.symbol]?.lowPct ?? null,
-    rsi: state.statsMap[r.symbol]?.rsi ?? null,
-    forwardPE: state.statsMap[r.symbol]?.forwardPE ?? null,
-  }));
+  return rows.map(r => {
+    const s = state.statsMap[r.symbol] || {};
+    return {
+      ...r,
+      name: r.name || s.name || '',
+      pct: r[t.pctField] != null ? r[t.pctField] : null,
+      ytdPct: s.ytdPct ?? null,
+      highPct: s.highPct ?? null,
+      lowPct: s.lowPct ?? null,
+      rsi: s.rsi ?? null,
+      forwardPE: s.forwardPE ?? null,
+      wkStatus: formatStatus(s.emaStatus?.weekly),
+      moStatus: formatStatus(s.emaStatus?.monthly),
+      qtrStatus: formatStatus(s.emaStatus?.quarterly),
+    };
+  });
 }
 
 /* ── Meta ── */
@@ -1925,8 +1959,15 @@ async function switchWeek(week) {
 
 function showSpecialTab(def) {
   if (def.special === 'miscStats') return showMiscStats();
+  if (def.special === 'summary') return showSummaryDashboard(def);
   // All other special tabs use standard sortable/filterable table
   return showSortableSpecialTab(def.id);
+}
+
+function showSummaryDashboard(def) {
+  const stats = Object.values(state.statsMap).filter(s => s.symbol && def.set.has(s.symbol));
+  state.data[def.id] = enrichRows(stats, def);
+  renderSortableTable(def.id, def.cols);
 }
 
 function showSortableSpecialTab(tabId) {

@@ -169,7 +169,15 @@ def _process_batch(
             w_closes = weekly_result[0] if weekly_result is not None else None
             computed = stats.compute_stats(daily_result[0], daily_result[1], vix_spikes=vix_spikes, forward_pe=forward_pe, forward_pe_history=pe_hist, weekly_closes=w_closes)
             if computed is not None:
-                computed.update({"symbol": symbol, "name": name})
+                computed.update({
+                    "symbol": symbol, 
+                    "name": name,
+                    "emaStatus": {
+                        "weekly": weekly.get("status"),
+                        "monthly": monthly.get("status"),
+                        "quarterly": quarterly.get("status")
+                    }
+                })
                 _add_special_stats(symbol, computed, daily_result, weekly_result)
                 batch.stats_data.append(computed)
 
@@ -233,6 +241,7 @@ def _process_timeframe(
     if (a_count := ema.count_periods_above(closes)) is not None:
         res["above"] = _entry(symbol, name, last_close, ema_value, a_count, "count", True)
 
+    res["status"] = {"above": (a_count > 0) if a_count else False, "count": a_count or b_count or 0}
     return res
 
 
