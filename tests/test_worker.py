@@ -156,22 +156,26 @@ class TestProcessBatch:
         assert len(result.crossdowns) == 1
         assert result.crossdowns[0]["weeksAbove"] == 4
 
-    def test_spy_includes_chatgpt_returns(self, mock_worker_deps):
+    def test_voo_includes_spx_returns(self, mock_worker_deps):
         mock_yahoo, _, mock_stats = mock_worker_deps
-        weekly_data = ([50.0] * 10, list(range(10)), "SPY")
+        weekly_data = ([50.0] * 10, list(range(10)), "VOO")
+        daily_data = ([100.0, 105.0], [1000, 2000], "VOO")
         mock_yahoo.fetch_quarterly_candles.return_value = weekly_data
-        mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "SPY")
+        mock_yahoo.fetch_stats_candles.return_value = daily_data
         mock_stats.compute_stats.return_value = {"close": 105.0}
-        # First call for ChatGPT (weekly), second for 5Y (weekly)
-        mock_stats.compute_return_since.side_effect = [45.0, 85.5]
+        # Election, Inauguration, ChatGPT, Bottom2022
+        mock_stats.compute_return_since.side_effect = [12.5, -3.0, 45.0, 60.0]
 
-        result = _process_batch(["SPY"])
+        result = _process_batch(["VOO"])
 
-        assert result.stats_data[0]["spySinceChatGPT"] == 45.0
-        assert result.stats_data[0]["return5Y"] == 85.5
-        # Should be called with weekly data (weekly_data[0/1])
+        assert result.stats_data[0]["spxSinceElection"] == 12.5
+        assert result.stats_data[0]["spxSinceInauguration"] == -3.0
+        assert result.stats_data[0]["spxSinceChatGPT"] == 45.0
+        assert result.stats_data[0]["spxSinceBottom2022"] == 60.0
+        # Should be called with daily data for most, but ChatGPT/Bottom could be weekly/daily depending on impl
+        # Our impl uses daily_result for all VOO special stats
         mock_stats.compute_return_since.assert_any_call(
-            weekly_data[0], weekly_data[1], 2022, 11, 30,
+            daily_data[0], daily_data[1], 2024, 11, 5,
         )
 
 
@@ -359,13 +363,13 @@ class TestComputeMiscStats:
         result = _compute_misc_stats(stats)
         assert result["pctWithin5OfHigh"] == 66.7
 
-    def test_spy_since_chatgpt_extracted(self):
+    def test_spx_since_chatgpt_extracted(self):
         stats = [
             {"symbol": "AAPL", "ytdPct": 5.0},
-            {"symbol": "SPY", "ytdPct": 8.0, "spySinceChatGPT": 45.67},
+            {"symbol": "VOO", "ytdPct": 8.0, "spxSinceChatGPT": 45.67},
         ]
         result = _compute_misc_stats(stats)
-        assert result["spySinceChatGPT"] == 45.67
+        assert result["spxSinceChatGPT"] == 45.67
 
 
 class TestAggregateResultsStats:

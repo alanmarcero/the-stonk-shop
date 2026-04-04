@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import time
 from dataclasses import dataclass, field
@@ -35,7 +35,7 @@ class BatchResult:
 RATE_LIMIT_DELAY = 1
 MIN_WEEKS_THRESHOLD = 3
 MAX_WEEKLY_SNAPSHOTS = 6
-_5Y_RETURN_SYMBOLS = {"SPY", "QQQ", "DIA", "IWM", "TMUS"}
+_5Y_RETURN_SYMBOLS = {"VOO", "QQQ", "DIA", "IWM", "TMUS"}
 
 
 def lambda_handler(event: dict, context: Any) -> dict:
@@ -178,18 +178,18 @@ def _process_batch(
 
 def _add_special_stats(symbol: str, computed: dict, daily_result: tuple, weekly_result: Optional[tuple]) -> None:
     if symbol == "VOO":
+        # SPX proxy stats
         election = stats.compute_return_since(daily_result[0], daily_result[1], 2024, 11, 5)
         if election is not None: computed["spxSinceElection"] = election
+        
         inauguration = stats.compute_return_since(daily_result[0], daily_result[1], 2025, 1, 20)
         if inauguration is not None: computed["spxSinceInauguration"] = inauguration
 
-    if symbol == "SPY" and weekly_result is not None:
-        chatgpt = stats.compute_return_since(weekly_result[0], weekly_result[1], 2022, 11, 30)
-        if chatgpt is not None: computed["spySinceChatGPT"] = chatgpt
+        chatgpt = stats.compute_return_since(daily_result[0], daily_result[1], 2022, 11, 30)
+        if chatgpt is not None: computed["spxSinceChatGPT"] = chatgpt
 
-    if symbol in _5Y_RETURN_SYMBOLS and weekly_result is not None:
-        ret = stats.compute_return_since(weekly_result[0], weekly_result[1], 2021, 3, 28)
-        if ret is not None: computed["return5Y"] = ret
+        bottom2022 = stats.compute_return_since(daily_result[0], daily_result[1], 2022, 10, 12)
+        if bottom2022 is not None: computed["spxSinceBottom2022"] = bottom2022
 
 
 def _process_timeframe(
@@ -346,14 +346,12 @@ def _compute_misc_stats(all_stats: list[dict], week_above_count: int = 0, total_
 
     voo = next((s for s in all_stats if s.get("symbol") == "VOO"), None)
     if voo:
-        for k in ("spxSinceElection", "spxSinceInauguration"):
+        for k in ("spxSinceElection", "spxSinceInauguration", "spxSinceChatGPT", "spxSinceBottom2022"):
             if k in voo: misc[k] = voo[k]
+        if "return5Y" in voo:
+            misc["spx5Y"] = voo["return5Y"]
 
-    spy = next((s for s in all_stats if s.get("symbol") == "SPY"), None)
-    if spy and "spySinceChatGPT" in spy:
-        misc["spySinceChatGPT"] = spy["spySinceChatGPT"]
-
-    for sym in ("SPY", "QQQ", "DIA", "IWM", "TMUS"):
+    for sym in ("QQQ", "DIA", "IWM", "TMUS"):
         entry = next((s for s in all_stats if s.get("symbol") == sym), None)
         if entry and "return5Y" in entry: misc[f"{sym.lower()}5Y"] = entry["return5Y"]
 

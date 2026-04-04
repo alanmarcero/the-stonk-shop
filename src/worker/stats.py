@@ -107,6 +107,13 @@ def compute_stats(
         smaw = round(sum(weekly_closes[-200:]) / 200, 2)
         stats_res.update({"sma200w": smaw, "pctSma200w": round((closes[-1] - smaw) / smaw * 100, 2) if smaw > 0 else 0.0})
 
+    # 5Y return
+    five_years_ago = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc).year - 5
+    last_ts = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc)
+    five_y_return = compute_return_since(closes, timestamps, five_years_ago, last_ts.month, last_ts.day)
+    if five_y_return is not None:
+        stats_res["return5Y"] = five_y_return
+
     if forward_pe is not None: stats_res["forwardPE"] = forward_pe
     if forward_pe_history: stats_res["forwardPEHistory"] = forward_pe_history
 
