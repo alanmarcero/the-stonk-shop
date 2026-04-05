@@ -968,6 +968,31 @@
   .status-above { background: var(--green-dim); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.2); }
   .status-below { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.2); }
   .status-neutral { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); }
+
+  /* ── EMA Checkbox Filters ── */
+  .ema-checkbox-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
+  .ema-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .ema-checkbox-group input {
+    margin: 0;
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+  }
+  .ema-checkbox-group:hover { color: var(--text-primary); }
 </style>
 </head>
 <body>
@@ -1007,19 +1032,21 @@ const VANGUARD = new Set(['VOO','VTI','VEA','VUG','VTV','BND','VXUS','VWO','VGT'
 
 const TOP_AUM = new Set(['SPY','IVV','VOO','VTI','QQQ','VEA','VTV','IEFA','BND','AGG','VWO','IWM','IEMG','VIG','VUG','IJR','VXUS','GLD','IJH','SCHD','VGT','XLK','BNDX','VO','IWF','VCIT','XLV','ITOT','BSV','DIA']);
 const VANECK_ETFS = new Set(['AFK','ANGL','BBH','BIZD','CLOB','CLOI','CRAK','DAPP','EINC','EMBX','EMLC','ESPO','ETHV','FLTR','GDX','GDXJ','GLIN','GPZ','GRNB','HAP','HODL','HYD','HYEM','ISRA','ITM','MLN','MOAT','MOO','MORT','MOTI','NLR','OIH','OUNZ','PFXF','PIT','PPH','RAAX','REMX','RTH','SHYD','SLX','SMB','SMH','SMHX','SMOG','SMOT','VNM','XMPT']);
-const WISDOMTREE_ETFS = new Set(['AGGY','AIVL','BTCW','CXSE','DDLS','DDWM','DEM','DES','DEW','DFE','DFJ','DGRE','DGRS','DGRW','DGS','DHS','DIM','DLN','DLS','DNL','DOL','DON','DTD','DTH','DWM','DXJ','EES','ELD','EMMF','EPI','EPS','EZM','GDE','GDMN','HEDJ','HYZD','IHDG','IQDG','NTSI','NTSX','QGRW','QHY','UNIY','USFR','USDU','USMF','WCLD','WTAI','WTMF','WTV','XSOE']);
-const GLOBALX_ETFS = new Set(['AIQ','ARGT','AUSF','BKCH','BOTZ','BUG','CATH','CHIQ','CLIP','CLOU','COPX','DAX','DIV','DJIA','DRIV','DTCR','EMBD','FINX','GOEX','GREK','GXIG','KRMA','LIT','MLPA','MLPX','NORW','ONOF','PFFD','PFFV','QYLG','QYLD','RSSL','RYLD','SDIV','SHLD','SIL','SNSR','SPFF','SRET','URA','XYLD','ZAP']);
-const ROUNDHILL_ETFS = new Set(['CHAT','MAGS','METV','QDTE','RDTE','XDTE','XPAY','YBTC']);
 const COMMODITY_ETFS = new Set(['COPX','DBA','DBC','ETHA','GDX','GLD','IBIT','PPLT','SIL','SLV','UNG','USO','XME']);
-const SECTOR_ETFS = new Set(['ARKF','ARKG','ARKK','ARKQ','ARKW','BITQ','BLOK','CIBR','CNCR','CQQQ','DFEN','EEM','FAN','FDIS','FDN','FHLC','FTEC','GRID','HACK','IBB','IBIT','ICLN','IFRA','IGV','IHF','IHI','ITA','ITB','IYE','IYF','IYH','IYR','IYT','IYW','IYZ','IZRL','JETS','KBE','KIE','KRE','KWEB','MJ','MSOS','ONLN','PAVE','PBE','PBW','PHO','PJP','PPH','PRNT','PSCT','PSI','QCLN','QQQJ','QTEC','ROBO','SKYY','SLV','SOXQ','SOXX','TAN','URNM','WOOD','XAR','XBI','XHB','XHE','XLB','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY','XME','XNTK','XOP','XRT','XSD','XSW','YOLO']);
+const SECTOR_ETFS = new Set([
+  'ARKF','ARKG','ARKK','ARKQ','ARKW','BITQ','BLOK','CIBR','CNCR','CQQQ','DFEN','EEM','FAN','FDIS','FDN','FHLC','FTEC','GRID','HACK','IBB','IBIT','ICLN','IFRA','IGV','IHF','IHI','ITA','ITB','IYE','IYF','IYH','IYR','IYT','IYW','IYZ','IZRL','JETS','KBE','KIE','KRE','KWEB','MJ','MSOS','ONLN','PAVE','PBE','PBW','PHO','PJP','PPH','PRNT','PSCT','PSI','QCLN','QQQJ','QTEC','ROBO','SKYY','SLV','SOXQ','SOXX','TAN','URNM','WOOD','XAR','XBI','XHB','XHE','XLB','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY','XME','XNTK','XOP','XRT','XSD','XSW','YOLO',
+  'AIQ','ARGT','AUSF','BKCH','BOTZ','BUG','CATH','CHIQ','CLIP','CLOU','COPX','DAX','DIV','DJIA','DRIV','DTCR','EMBD','FINX','GOEX','GREK','GXIG','KRMA','LIT','MLPA','MLPX','NORW','ONOF','PFFD','PFFV','QYLG','QYLD','RSSL','RYLD','SDIV','SHLD','SIL','SNSR','SPFF','SRET','URA','XYLD','ZAP',
+  'CHAT','MAGS','METV','QDTE','RDTE','XDTE','XPAY','YBTC',
+  'AGGY','AIVL','BTCW','CXSE','DDLS','DDWM','DEM','DES','DEW','DFE','DFJ','DGRE','DGRS','DGRW','DGS','DHS','DIM','DLN','DLS','DNL','DOL','DON','DTD','DTH','DWM','DXJ','EES','ELD','EMMF','EPI','EPS','EZM','GDE','GDMN','HEDJ','HYZD','IHDG','IQDG','NTSI','NTSX','QGRW','QHY','UNIY','USFR','USDU','USMF','WCLD','WTAI','WTMF','WTV','XSOE'
+]);
 
-const ALL_ETFS = new Set([...TOP_AUM, ...TOP_VOL, ...SPDR, ...VANGUARD, ...VANECK_ETFS, ...WISDOMTREE_ETFS, ...GLOBALX_ETFS, ...ROUNDHILL_ETFS, ...COMMODITY_ETFS, ...SECTOR_ETFS]);
+const ALL_ETFS = new Set([...TOP_AUM, ...TOP_VOL, ...SPDR, ...VANGUARD, ...VANECK_ETFS, ...COMMODITY_ETFS, ...SECTOR_ETFS]);
 const SPDR_SECTORS = new Set(['SPY','XLE','XLK','XLB','XLV','XLY','XLI','XLC','XLU','XLF','XLRE','XLP']);
 const INDEX_SYMBOLS = new Set(['SPY','QQQ','DIA','IWM']);
 const MAJOR_TARGETS = new Set([...INDEX_SYMBOLS, ...TOP_AUM, ...MEGA_CAP_500B]);
 
 const CAP_FILTERS = ['all', 'small', 'mega'];
-const ETF_FILTERS = ['topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'wisdomTree', 'globalX', 'roundhill', 'commodities', 'sector'];
+const ETF_FILTERS = ['topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'commodities', 'sector'];
 
 const SOURCE_DEFS = {
   all:        { label: 'All' },
@@ -1032,14 +1059,11 @@ const SOURCE_DEFS = {
   spdrSectors:{ label: 'Sectors',     set: SPDR_SECTORS },
   vanguard:   { label: 'Vanguard',     set: VANGUARD },
   vaneck:     { label: 'VanEck',       set: VANECK_ETFS },
-  wisdomTree: { label: 'WisdomTree',   set: WISDOMTREE_ETFS },
-  globalX:    { label: 'Global X',     set: GLOBALX_ETFS },
-  roundhill:  { label: 'Roundhill',    set: ROUNDHILL_ETFS },
   commodities:{ label: 'Commodities', set: COMMODITY_ETFS },
   sector:     { label: 'Other ETFs',   set: SECTOR_ETFS },
 };
 
-const SOURCE_ORDER = ['all', 'none', 'small', 'mega', 'topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'wisdomTree', 'globalX', 'roundhill', 'commodities', 'sector'];
+const SOURCE_ORDER = ['all', 'none', 'small', 'mega', 'topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'commodities', 'sector'];
 
 const DEFAULT_FILTERS = {
   close: { min: 10 },
@@ -1049,6 +1073,9 @@ const DEFAULT_FILTERS = {
   monthsBelow: { min: 4 },
   monthsAbove: { min: 3 },
   pct: { min: 3 },
+  wkStatus: { above: true, below: true },
+  moStatus: { above: true, below: true },
+  qtrStatus: { above: true, below: true },
 };
 
 const TAB_DEFS = [
@@ -1356,6 +1383,11 @@ function applyFilters(rows, cols) {
       if (!filter) continue;
       if (col === 'symbol') {
         if (filter.text && !String(row[col]).toLowerCase().includes(filter.text.toLowerCase())) return false;
+      } else if (col === 'wkStatus' || col === 'moStatus' || col === 'qtrStatus') {
+        const timeframe = col.replace('Status', '');
+        const isAbove = row.emaStatus?.[timeframe]?.above;
+        if (isAbove && !filter.above) return false;
+        if (!isAbove && !filter.below) return false;
       } else {
         const val = row[col];
         if (val == null) return false;
@@ -1444,7 +1476,7 @@ function renderTbodyHTML(rows, cols, pctField, tabId) {
 /* ── Tabs ── */
 
 function getTabCount(t) {
-  if (t.special === 'miscStats') return '';
+  if (t.id === 'miscStats') return '';
   if (t.special) {
     const rows = state.data[t.id] || [];
     return `${rows.filter(r => matchesSources(r.symbol)).length}`;
@@ -1453,7 +1485,7 @@ function getTabCount(t) {
   const filtered = state.data[t.id] ? applyFilters(state.data[t.id], t.cols).length : 0;
   const isActive = t.id === state.activeTab;
   const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
-    Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null));
+    Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null) || f.above !== undefined);
   return hasFilter ? `${filtered} / ${total}` : `${total}`;
 }
 
@@ -1642,6 +1674,13 @@ function renderFilterRow(def) {
       const val = state.filters[c]?.text || '';
       return `<td class="col-symbol-filter"><input type="text" class="filter-symbol" data-col="${c}" placeholder="Filter\u2026" value="${esc(val)}"></td>`;
     }
+    if (c === 'wkStatus' || c === 'moStatus' || c === 'qtrStatus') {
+      const f = state.filters[c] || { above: true, below: true };
+      return `<td><div class="ema-checkbox-filters">` +
+        `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="above" ${f.above ? 'checked' : ''}> Above</label>` +
+        `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="below" ${f.below ? 'checked' : ''}> Below</label>` +
+        `</div></td>`;
+    }
     const f = state.filters[c] || {};
     const minVal = f.min != null ? f.min : '';
     const stackClass = c === 'close' ? ' num-filters-stacked' : '';
@@ -1691,6 +1730,7 @@ function attachFilterListeners(def, tabId) {
   }, 150);
   document.querySelectorAll('.filter-row input').forEach(input => {
     input.addEventListener('input', () => {
+      if (input.type === 'checkbox') return;
       const col = input.dataset.col;
       const bound = input.dataset.bound;
       if (col === 'symbol') {
@@ -1703,6 +1743,16 @@ function attachFilterListeners(def, tabId) {
       state.lowSignalActive = false;
       debouncedFilterUpdate();
     });
+    if (input.type === 'checkbox') {
+      input.addEventListener('change', () => {
+        const col = input.dataset.col;
+        const bound = input.dataset.bound;
+        if (!state.filters[col]) state.filters[col] = { above: true, below: true };
+        state.filters[col][bound] = input.checked;
+        state.lowSignalActive = false;
+        debouncedFilterUpdate();
+      });
+    }
   });
 
   document.querySelectorAll('.spin-btn').forEach(btn => {
