@@ -951,18 +951,22 @@
   }
 
   .status-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 10px;
-    font-weight: 600;
-    line-height: 1.2;
+    font-weight: 700;
+    line-height: 1;
     text-align: center;
-    min-width: 60px;
+    min-width: 42px;
+    height: 18px;
+    font-family: var(--font-data);
   }
-  .status-above { background: var(--green-dim); color: var(--green); }
-  .status-below { background: var(--red-dim); color: var(--red); }
-  .status-neutral { background: var(--bg-elevated); color: var(--text-muted); }
+  .status-above { background: var(--green-dim); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.2); }
+  .status-below { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.2); }
+  .status-neutral { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -1046,8 +1050,8 @@ const DEFAULT_FILTERS = {
 };
 
 const TAB_DEFS = [
-  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','name','close','ytdPct','wkStatus','moStatus','qtrStatus'] },
-  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','name','close','ytdPct','wkStatus','moStatus','qtrStatus'] },
+  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','close','ytdPct','highPct','rsi','wkStatus','moStatus','qtrStatus'] },
+  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','close','ytdPct','highPct','rsi','wkStatus','moStatus','qtrStatus'] },
   { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','name','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
   { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
   { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
@@ -1807,10 +1811,11 @@ function fmtNum(col, v) {
 }
 
 function formatStatus(status) {
-  if (!status || status.count == null) return '<div class="status-badge status-neutral">?</div>';
-  const cls = status.above ? 'status-above' : 'status-below';
-  const label = status.above ? 'Above' : 'Below';
-  return `<div class="status-badge ${cls}">${label} (${status.count})</div>`;
+  if (!status || status.count == null) return '<div class="status-badge status-neutral">\u2014</div>';
+  const isAbove = !!status.above;
+  const cls = isAbove ? 'status-above' : 'status-below';
+  const icon = isAbove ? '\u25B2' : '\u25BC';
+  return `<div class="status-badge ${cls}" style="font-family:var(--font-data); font-size:10px; padding:2px 4px; min-width:45px;">${icon} ${status.count}</div>`;
 }
 
 function esc(s) {
@@ -2231,7 +2236,6 @@ async function fetchAll(isSilentRefresh = false) {
     document.getElementById('content').innerHTML = '<div class="loading">Loading scan data&hellip;</div>';
   }
 
-  console.log('fetchAll: starting');
   const [manifestResult, statsResult, ...results] = await Promise.allSettled([
     fetch(`/results/manifest.json?${cb}`).then(r => {
       if (!r.ok) throw new Error(r.status);
@@ -2246,7 +2250,6 @@ async function fetchAll(isSilentRefresh = false) {
       return r.json();
     })),
   ]);
-  console.log('fetchAll: requests settled');
 
   if (manifestResult.status === 'fulfilled') {
     const mv = manifestResult.value;
@@ -2257,7 +2260,6 @@ async function fetchAll(isSilentRefresh = false) {
     state.statsMap = Object.fromEntries(statsResult.value.stats.map(s => [s.symbol, s]));
     if (statsResult.value.misc) state.statsMap._misc = statsResult.value.misc;
   }
-  console.log('fetchAll: statsMap built');
 
   const byUrl = {};
   urls.forEach((u, i) => {
@@ -2267,23 +2269,19 @@ async function fetchAll(isSilentRefresh = false) {
   const meta = byUrl[urls[0]] || byUrl[urls[1]] || byUrl[urls[2]];
   if (meta) renderMeta(meta);
 
-  console.log('fetchAll: calling populateTabData');
   populateTabData(byUrl);
-  console.log('fetchAll: populateTabData done');
 
   if (!Object.values(byUrl).length) {
     document.getElementById('content').innerHTML = '<div class="error-msg">Failed to load scan data.</div>';
     return;
   }
 
-  console.log('fetchAll: initializing UI');
   initDefaultFilters();
   renderSourceToggles();
   renderWeekSelector();
   renderTabs();
   writeHash();
   showTab(state.activeTab);
-  console.log('fetchAll: complete');
 }
 
 fetchAll();
