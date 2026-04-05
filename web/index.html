@@ -1073,9 +1073,9 @@ const DEFAULT_FILTERS = {
   monthsBelow: { min: 4 },
   monthsAbove: { min: 3 },
   pct: { min: 3 },
-  wkStatus: { above: true, below: true },
-  moStatus: { above: true, below: true },
-  qtrStatus: { above: true, below: true },
+  wkStatus: { above: true, below: true, ontop: true },
+  moStatus: { above: true, below: true, ontop: true },
+  qtrStatus: { above: true, below: true, ontop: true },
 };
 
 const TAB_DEFS = [
@@ -1384,10 +1384,11 @@ function applyFilters(rows, cols) {
       if (col === 'symbol') {
         if (filter.text && !String(row[col]).toLowerCase().includes(filter.text.toLowerCase())) return false;
       } else if (col === 'wkStatus' || col === 'moStatus' || col === 'qtrStatus') {
-        const timeframe = col.replace('Status', '');
-        const isAbove = row.emaStatus?.[timeframe]?.above;
-        if (isAbove && !filter.above) return false;
-        if (!isAbove && !filter.below) return false;
+        const timeframeMap = { wkStatus: 'weekly', moStatus: 'monthly', qtrStatus: 'quarterly' };
+        const status = row.emaStatus?.[timeframeMap[col]];
+        if (!status || status.above == null) continue; // Skip if no status data
+        if (status.above && !filter.above) return false;
+        if (!status.above && !filter.below) return false;
       } else {
         const val = row[col];
         if (val == null) return false;

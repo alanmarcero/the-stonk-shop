@@ -275,7 +275,11 @@ def _process_timeframe(
     if (a_count := ema.count_periods_above(closes)) is not None:
         res["above"] = _entry(symbol, name, last_close, ema_value, a_count, "count", True)
 
-    res["status"] = {"above": (a_count > 0) if a_count else False, "count": a_count or b_count or 0}
+    res["status"] = {
+        "above": (a_count > 0) if a_count else False,
+        "count": a_count or b_count or 0,
+        "pctDiff": _pct_diff(last_close, ema_value)
+    }
     return res
 
 

@@ -1,7 +1,7 @@
 from typing import Optional
 
 DEFAULT_PERIOD = 5
-BUFFER = 0.01  # 1% threshold to avoid false signals from noise near the EMA line
+BUFFER = 0.015  # 1.5% threshold to avoid false signals from noise near the EMA line
 
 
 def _build_ema_series(closes: list[float], period: int) -> list[float]:
