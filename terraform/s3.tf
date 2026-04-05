@@ -75,6 +75,7 @@ resource "aws_s3_bucket_policy" "cloudfront_access" {
           "${aws_s3_bucket.scanner.arn}/results/*",
           "${aws_s3_bucket.scanner.arn}/app/*",
           "${aws_s3_bucket.scanner.arn}/symbols/*",
+          "${aws_s3_bucket.scanner.arn}/favicon.ico",
         ]
         Condition = {
           StringEquals = {
