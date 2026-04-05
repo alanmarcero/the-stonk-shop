@@ -1386,9 +1386,16 @@ function applyFilters(rows, cols) {
       } else if (col === 'wkStatus' || col === 'moStatus' || col === 'qtrStatus') {
         const timeframeMap = { wkStatus: 'weekly', moStatus: 'monthly', qtrStatus: 'quarterly' };
         const status = row.emaStatus?.[timeframeMap[col]];
-        if (!status || status.above == null) continue; // Skip if no status data
-        if (status.above && !filter.above) return false;
-        if (!status.above && !filter.below) return false;
+        if (!status || status.above == null) continue;
+        
+        const isOnTop = Math.abs(status.pctDiff || 0) <= 1.5;
+        if (isOnTop) {
+          if (!filter.ontop) return false;
+        } else if (status.above) {
+          if (!filter.above) return false;
+        } else {
+          if (!filter.below) return false;
+        }
       } else {
         const val = row[col];
         if (val == null) return false;
@@ -1676,10 +1683,11 @@ function renderFilterRow(def) {
       return `<td class="col-symbol-filter"><input type="text" class="filter-symbol" data-col="${c}" placeholder="Filter\u2026" value="${esc(val)}"></td>`;
     }
     if (c === 'wkStatus' || c === 'moStatus' || c === 'qtrStatus') {
-      const f = state.filters[c] || { above: true, below: true };
+      const f = state.filters[c] || { above: true, below: true, ontop: true };
       return `<td><div class="ema-checkbox-filters">` +
         `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="above" ${f.above ? 'checked' : ''}> Above</label>` +
         `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="below" ${f.below ? 'checked' : ''}> Below</label>` +
+        `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="ontop" ${f.ontop ? 'checked' : ''}> On-Top</label>` +
         `</div></td>`;
     }
     const f = state.filters[c] || {};
@@ -1748,7 +1756,7 @@ function attachFilterListeners(def, tabId) {
       input.addEventListener('change', () => {
         const col = input.dataset.col;
         const bound = input.dataset.bound;
-        if (!state.filters[col]) state.filters[col] = { above: true, below: true };
+        if (!state.filters[col]) state.filters[col] = { above: true, below: true, ontop: true };
         state.filters[col][bound] = input.checked;
         state.lowSignalActive = false;
         debouncedFilterUpdate();
@@ -1865,6 +1873,8 @@ function fmtNum(col, v) {
 
 function formatStatus(status) {
   if (!status || status.above == null) return '\u2014';
+  const isOnTop = Math.abs(status.pctDiff || 0) <= 1.5;
+  if (isOnTop) return `<span style="color:var(--blue)">On-Top</span>`;
   const cls = status.above ? 'pct-positive' : 'pct-negative';
   return `<span class="${cls}">${status.above ? 'Above' : 'Below'}</span>`;
 }
