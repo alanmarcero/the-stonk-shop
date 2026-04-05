@@ -1052,8 +1052,8 @@ const DEFAULT_FILTERS = {
 };
 
 const TAB_DEFS = [
-  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','close','ytdPct','highPct','rsi','wkStatus','moStatus','qtrStatus'] },
-  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','close','ytdPct','highPct','rsi','wkStatus','moStatus','qtrStatus'] },
+  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
+  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
   { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','name','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
   { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
   { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
@@ -1780,8 +1780,8 @@ function showTab(tabId) {
 }
 
 const SPECIAL_TAB_COLS = {
-  performance: ['symbol','close','ytdPct','highPct','lowPct','rsi','forwardPE','pctSma200d','pctSma200w'],
-  priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct','rsi'],
+  performance: ['symbol','close','ytdPct','highPct','lowPct','forwardPE','pctSma200d','pctSma200w'],
+  priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct'],
 };
 
 function updateRows(tabId) {
@@ -1813,11 +1813,9 @@ function fmtNum(col, v) {
 }
 
 function formatStatus(status) {
-  if (!status || status.count == null) return '<div class="status-badge status-neutral">\u2014</div>';
-  const isAbove = !!status.above;
-  const cls = isAbove ? 'status-above' : 'status-below';
-  const icon = isAbove ? '\u25B2' : '\u25BC';
-  return `<div class="status-badge ${cls}" style="font-family:var(--font-data); font-size:10px; padding:2px 4px; min-width:45px;">${icon} ${status.count}</div>`;
+  if (!status || status.above == null) return '\u2014';
+  const cls = status.above ? 'pct-positive' : 'pct-negative';
+  return `<span class="${cls}">${status.above ? 'Above' : 'Below'}</span>`;
 }
 
 function esc(s) {
