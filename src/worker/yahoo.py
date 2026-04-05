@@ -73,47 +73,35 @@ def fetch_forward_pe(symbol: str) -> tuple[Optional[float], Optional[dict]]:
 def _parse_forward_pe(response_data: dict) -> Optional[float]:
     """Extract the most recent forward P/E value from timeseries response."""
     try:
-        results = response_data["timeseries"]["result"]
+        results = response_data.get("timeseries", {}).get("result", [])
         for entry_group in results:
-            entries = entry_group.get("quarterlyForwardPeRatio")
-            if entries:
-                last = entries[-1]
-                return round(last["reportedValue"]["raw"], 2)
+            if entries := entry_group.get("quarterlyForwardPeRatio"):
+                return round(entries[-1]["reportedValue"]["raw"], 2)
     except (KeyError, IndexError, TypeError, ValueError) as err:
         print(f"[yahoo] parse error: {err}")
-        return None
     return None
 
 
 def _parse_forward_pe_history(response_data: dict) -> Optional[dict]:
     """Parse all quarterly forward P/E entries into a dict of quarter labels."""
     try:
-        results = response_data["timeseries"]["result"]
+        results = response_data.get("timeseries", {}).get("result", [])
         for entry_group in results:
-            entries = entry_group.get("quarterlyForwardPeRatio")
-            if not entries:
+            if not (entries := entry_group.get("quarterlyForwardPeRatio")):
                 continue
-            
-            history = {}
-            for entry in entries:
-                date_str = entry.get("asOfDate", "")
-                raw = entry.get("reportedValue", {}).get("raw")
-                if not date_str or raw is None:
-                    continue
-                
-                parts = date_str.split("-")
-                if len(parts) == 3:
-                    month = int(parts[1])
-                    year = int(parts[0])
-                    quarter_num = (month - 1) // 3 + 1
-                    short_year = str(year)[-2:]
-                    history[f"Q{quarter_num}'{short_year}"] = round(raw, 2)
-            
+
+            history = {
+                f"Q{(int(parts[1]) - 1) // 3 + 1}'{parts[0][-2:]}": round(entry["reportedValue"]["raw"], 2)
+                for entry in entries
+                if (date_str := entry.get("asOfDate", ""))
+                and (raw := entry.get("reportedValue", {}).get("raw")) is not None
+                and len(parts := date_str.split("-")) == 3
+            }
             return history if history else None
     except (KeyError, IndexError, TypeError, ValueError) as err:
         print(f"[yahoo] parse error: {err}")
-        return None
     return None
+
 
 
 def _parse_response(response_data: dict) -> Optional[tuple[list[float], list[int], str]]:

@@ -86,16 +86,13 @@ def _aggregate_to_monthly(closes: list[float], timestamps: list[int]) -> list[fl
     """Take the last close per calendar month from weekly data, excluding current month."""
     if not closes:
         return []
-    
+
     now = datetime.now(timezone.utc)
-    monthly: dict[tuple[int, int], float] = {}
-    
-    for close, ts in zip(closes, timestamps):
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        # Only include if month is before current month OR it's a previous year
-        if dt.year < now.year or dt.month < now.month:
-            monthly[(dt.year, dt.month)] = close
-            
+    monthly = {
+        (dt.year, dt.month): close
+        for close, ts in zip(closes, timestamps)
+        if (dt := datetime.fromtimestamp(ts, tz=timezone.utc)).year < now.year or dt.month < now.month
+    }
     return [monthly[k] for k in sorted(monthly.keys())]
 
 
@@ -103,18 +100,14 @@ def _aggregate_to_quarterly(closes: list[float], timestamps: list[int]) -> list[
     """Take the last close per calendar quarter from weekly data, excluding current quarter."""
     if not closes:
         return []
-    
+
     now = datetime.now(timezone.utc)
     now_q = (now.month - 1) // 3 + 1
-    quarterly: dict[tuple[int, int], float] = {}
-    
-    for close, ts in zip(closes, timestamps):
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        q = (dt.month - 1) // 3 + 1
-        # Only include if quarter is before current quarter OR it's a previous year
-        if dt.year < now.year or q < now_q:
-            quarterly[(dt.year, q)] = close
-            
+    quarterly = {
+        (dt.year, (dt.month - 1) // 3 + 1): close
+        for close, ts in zip(closes, timestamps)
+        if (dt := datetime.fromtimestamp(ts, tz=timezone.utc)).year < now.year or (dt.month - 1) // 3 + 1 < now_q
+    }
     return [quarterly[k] for k in sorted(quarterly.keys())]
 
 
@@ -135,53 +128,94 @@ def _entry(symbol: str, name: str, close: float, ema_val: float, val: int, key: 
     }
 
 
-def _process_batch(
-    symbols: list[str],
-    vix_spikes: Optional[list[dict]] = None,
-) -> BatchResult:
+def _process_batch(symbols: list[str], vix_spikes: Optional[list[dict]] = None) -> BatchResult:
     batch = BatchResult()
-
     for i, symbol in enumerate(symbols):
         if i > 0:
             time.sleep(RATE_LIMIT_DELAY)
-
-        weekly_result = yahoo.fetch_quarterly_candles(symbol)
-        daily_result = yahoo.fetch_stats_candles(symbol)
-
-        if weekly_result is None and daily_result is None:
-            print(f"[worker] {symbol}: fetch failed")
-            batch.errors.append({"symbol": symbol, "error": "Failed to fetch candles"})
-            continue
-
-        name = weekly_result[2] if weekly_result else daily_result[2]
-
-        weekly = _process_timeframe(symbol, name, weekly_result, "weeksBelow", "weeksAbove", min_below=MIN_WEEKS_THRESHOLD)
-        _append_timeframe_results(batch, weekly, "crossovers", "crossdowns", "week_below", "week_above")
-
-        monthly = _process_timeframe(symbol, name, weekly_result, "monthsBelow", "monthsAbove", aggregate_fn=_aggregate_to_monthly)
-        _append_timeframe_results(batch, monthly, "month_crossovers", "month_crossdowns", "month_below", "month_above")
-
-        quarterly = _process_timeframe(symbol, name, weekly_result, "quartersBelow", "quartersAbove", aggregate_fn=_aggregate_to_quarterly)
-        _append_timeframe_results(batch, quarterly, "quarter_crossovers", "quarter_crossdowns", "quarter_below", "quarter_above")
-
-        if daily_result is not None:
-            forward_pe, pe_hist = yahoo.fetch_forward_pe(symbol)
-            w_closes = weekly_result[0] if weekly_result is not None else None
-            computed = stats.compute_stats(daily_result[0], daily_result[1], vix_spikes=vix_spikes, forward_pe=forward_pe, forward_pe_history=pe_hist, weekly_closes=w_closes)
-            if computed is not None:
-                computed.update({
-                    "symbol": symbol, 
-                    "name": name,
-                    "emaStatus": {
-                        "weekly": weekly.get("status"),
-                        "monthly": monthly.get("status"),
-                        "quarterly": quarterly.get("status")
-                    }
-                })
-                _add_special_stats(symbol, computed, daily_result, weekly_result)
-                batch.stats_data.append(computed)
-
+        _process_symbol(symbol, batch, vix_spikes)
     return batch
+
+
+def _append_timeframe_results(batch: BatchResult, timeframe_result: dict) -> None:
+    """Helper to append individual timeframe results to the batch collections."""
+    if crossover := timeframe_result.get("crossover"):
+        batch.crossovers.append(crossover)
+    if crossdown := timeframe_result.get("crossdown"):
+        batch.crossdowns.append(crossdown)
+    if below := timeframe_result.get("below"):
+        batch.week_below.append(below)
+    if above := timeframe_result.get("above"):
+        batch.week_above.append(above)
+
+
+def _append_monthly_results(batch: BatchResult, res: dict) -> None:
+    if res.get("crossover"): batch.month_crossovers.append(res["crossover"])
+    if res.get("crossdown"): batch.month_crossdowns.append(res["crossdown"])
+    if res.get("below"): batch.month_below.append(res["below"])
+    if res.get("above"): batch.month_above.append(res["above"])
+
+
+def _append_quarterly_results(batch: BatchResult, res: dict) -> None:
+    if res.get("crossover"): batch.quarter_crossovers.append(res["crossover"])
+    if res.get("crossdown"): batch.quarter_crossdowns.append(res["crossdown"])
+    if res.get("below"): batch.quarter_below.append(res["below"])
+    if res.get("above"): batch.quarter_above.append(res["above"])
+
+
+def _process_symbol(symbol: str, batch: BatchResult, vix_spikes: Optional[list[dict]] = None) -> None:
+    weekly_result = yahoo.fetch_quarterly_candles(symbol)
+    daily_result = yahoo.fetch_stats_candles(symbol)
+
+    if weekly_result is None and daily_result is None:
+        print(f"[worker] {symbol}: fetch failed")
+        batch.errors.append({"symbol": symbol, "error": "Failed to fetch candles"})
+        return
+
+    name = weekly_result[2] if weekly_result else daily_result[2]
+
+    weekly = _process_timeframe(symbol, name, weekly_result, "weeksBelow", "weeksAbove", min_below=MIN_WEEKS_THRESHOLD)
+    _append_timeframe_results(batch, weekly)
+
+    monthly = _process_timeframe(symbol, name, weekly_result, "monthsBelow", "monthsAbove", aggregate_fn=_aggregate_to_monthly)
+    _append_monthly_results(batch, monthly)
+
+    quarterly = _process_timeframe(symbol, name, weekly_result, "quartersBelow", "quartersAbove", aggregate_fn=_aggregate_to_quarterly)
+    _append_quarterly_results(batch, quarterly)
+
+    if daily_result is not None:
+        _process_stats_for_symbol(symbol, name, daily_result, weekly_result, batch, weekly, monthly, quarterly, vix_spikes)
+
+
+def _process_stats_for_symbol(
+    symbol: str,
+    name: str,
+    daily_result: tuple,
+    weekly_result: Optional[tuple],
+    batch: BatchResult,
+    weekly: dict,
+    monthly: dict,
+    quarterly: dict,
+    vix_spikes: Optional[list[dict]],
+) -> None:
+    forward_pe, pe_hist = yahoo.fetch_forward_pe(symbol)
+    w_closes = weekly_result[0] if weekly_result is not None else None
+    computed = stats.compute_stats(daily_result[0], daily_result[1], vix_spikes=vix_spikes, forward_pe=forward_pe, forward_pe_history=pe_hist, weekly_closes=w_closes)
+    
+    if computed is None:
+        return
+
+    computed.update({
+        "symbol": symbol,
+        "name": name,
+        "emaStatus": {
+            "weekly": weekly.get("status"),
+            "monthly": monthly.get("status"),
+            "quarterly": quarterly.get("status")
+        }
+    })
+    _add_special_stats(symbol, computed, daily_result, weekly_result)
+    batch.stats_data.append(computed)
 
 
 def _add_special_stats(symbol: str, computed: dict, daily_result: tuple, weekly_result: Optional[tuple]) -> None:
@@ -245,24 +279,6 @@ def _process_timeframe(
     return res
 
 
-def _append_timeframe_results(
-    batch: BatchResult,
-    result: dict[str, Optional[dict]],
-    cross_up_attr: str,
-    cross_down_attr: str,
-    below_attr: str,
-    above_attr: str,
-) -> None:
-    if result["crossover"] is not None:
-        getattr(batch, cross_up_attr).append(result["crossover"])
-    if result["crossdown"] is not None:
-        getattr(batch, cross_down_attr).append(result["crossdown"])
-    if result["below"] is not None:
-        getattr(batch, below_attr).append(result["below"])
-    if result["above"] is not None:
-        getattr(batch, above_attr).append(result["above"])
-
-
 def _write_batch_results(bucket: str, run_id: str, idx: int, count: int, err_count: int, batch: BatchResult) -> None:
     body = {
         "batchIndex": idx, "symbolsProcessed": count, "errors": err_count, "errorDetails": batch.errors,
@@ -312,12 +328,20 @@ def _write_results(bucket: str, agg: dict, total_sym: int, total_err: int, *, sn
         if snapshot:
             storage.put_json(bucket, f"results/{scan_date}{suffix}.json", res)
 
-    agg["errorDetails"].sort(key=lambda x: x.get("symbol", ""))
-    storage.put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": agg["errorDetails"]})
+    _write_error_details(bucket, base, agg["errorDetails"])
+    _write_stats_results(bucket, base, agg, total_sym, snapshot, scan_date)
 
-    agg["stats"].sort(key=lambda x: x.get("symbol", ""))
-    misc = _compute_misc_stats(agg["stats"], len(agg["weekAbove"]), total_sym)
-    stats_res = {**base, "stats": agg["stats"], "misc": misc}
+
+def _write_error_details(bucket: str, base: dict, error_details: list[dict]) -> None:
+    error_details.sort(key=lambda x: x.get("symbol", ""))
+    storage.put_json(bucket, "results/latest-errors.json", {**base, "errorDetails": error_details})
+
+
+def _write_stats_results(bucket: str, base: dict, agg: dict, total_sym: int, snapshot: bool, scan_date: str) -> None:
+    stats_list = agg["stats"]
+    stats_list.sort(key=lambda x: x.get("symbol", ""))
+    misc = _compute_misc_stats(stats_list, len(agg["weekAbove"]), total_sym)
+    stats_res = {**base, "stats": stats_list, "misc": misc}
     storage.put_json(bucket, "results/latest-stats.json", stats_res)
 
     if snapshot:
@@ -326,45 +350,69 @@ def _write_results(bucket: str, agg: dict, total_sym: int, total_err: int, *, sn
 
 
 def _compute_misc_stats(all_stats: list[dict], week_above_count: int = 0, total_symbols: int = 0) -> dict:
-    if not all_stats: return {}
-    total = len(all_stats)
-    h_pcts = [s["highPct"] for s in all_stats if "highPct" in s]
-    y_pcts = [s["ytdPct"] for s in all_stats if "ytdPct" in s]
-    f_pes = [s["forwardPE"] for s in all_stats if "forwardPE" in s]
+    if not all_stats:
+        return {}
 
     misc: dict = {}
-    if h_pcts and total:
+    total = len(all_stats)
+
+    _add_performance_averages(misc, all_stats, total)
+    _add_ema_breadth_stats(misc, week_above_count, total_symbols)
+    _add_sma_breadth_stats(misc, all_stats)
+    _add_index_benchmarks(misc, all_stats)
+
+    return misc
+
+
+def _add_performance_averages(misc: dict, all_stats: list[dict], total: int) -> None:
+    h_pcts = [s["highPct"] for s in all_stats if "highPct" in s]
+    if h_pcts:
         misc["pctWithin5OfHigh"] = round(sum(1 for h in h_pcts if h >= -5) / total * 100, 1)
-    if y_pcts and total:
+
+    y_pcts = [s["ytdPct"] for s in all_stats if "ytdPct" in s]
+    if y_pcts:
         misc["pctPositiveYTD"] = round(sum(1 for y in y_pcts if y >= 0) / total * 100, 1)
         misc["avgYTD"] = round(sum(y_pcts) / len(y_pcts), 2)
+
+    f_pes = [s["forwardPE"] for s in all_stats if "forwardPE" in s]
     if f_pes:
         misc["avgForwardPE"] = round(sum(f_pes) / len(f_pes), 2)
         sorted_pes = sorted(f_pes)
         mid = len(sorted_pes) // 2
-        misc["medianForwardPE"] = round((sorted_pes[mid-1] + sorted_pes[mid]) / 2 if len(sorted_pes) % 2 == 0 else sorted_pes[mid], 2)
+        misc["medianForwardPE"] = round(
+            (sorted_pes[mid - 1] + sorted_pes[mid]) / 2 if len(sorted_pes) % 2 == 0 else sorted_pes[mid], 2
+        )
 
+
+def _add_ema_breadth_stats(misc: dict, week_above_count: int, total_symbols: int) -> None:
     if total_symbols:
         misc["pctAbove5wkEMA"] = round(week_above_count / total_symbols * 100, 1)
         misc["pctBelow5wkEMA"] = round((total_symbols - week_above_count) / total_symbols * 100, 1)
 
+
+def _add_sma_breadth_stats(misc: dict, all_stats: list[dict]) -> None:
     for key, field in [("pctAbove200dSMA", "pctSma200d"), ("pctAbove200wSMA", "pctSma200w")]:
         vals = [s[field] for s in all_stats if s.get(field) is not None]
         if vals:
             misc[key] = round(sum(1 for v in vals if v >= 0) / len(vals) * 100, 1)
 
+
+def _add_index_benchmarks(misc: dict, all_stats: list[dict]) -> None:
+    # SPX benchmarks from VOO
     voo = next((s for s in all_stats if s.get("symbol") == "VOO"), None)
     if voo:
         for k in ("spxSinceElection", "spxSinceInauguration", "spxSinceChatGPT", "spxSinceBottom2022"):
-            if k in voo: misc[k] = voo[k]
+            if k in voo:
+                misc[k] = voo[k]
         if "return5Y" in voo:
             misc["spx5Y"] = voo["return5Y"]
 
+    # Other major indices
     for sym in ("QQQ", "DIA", "IWM", "TMUS"):
         entry = next((s for s in all_stats if s.get("symbol") == sym), None)
-        if entry and "return5Y" in entry: misc[f"{sym.lower()}5Y"] = entry["return5Y"]
+        if entry and "return5Y" in entry:
+            misc[f"{sym.lower()}5Y"] = entry["return5Y"]
 
-    return misc
 
 
 def _update_manifest(bucket: str, scan_date: str) -> None:

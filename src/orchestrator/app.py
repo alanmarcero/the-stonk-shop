@@ -2,7 +2,7 @@ import json
 import os
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 import boto3
 
@@ -20,13 +20,37 @@ sqs = boto3.client("sqs")
 def lambda_handler(event: dict, context: Any) -> dict:
     bucket = os.environ["BUCKET_NAME"]
     queue_url = os.environ["QUEUE_URL"]
-    dev_key = os.environ.get("DEV_KEY", "stonks-unconfigured-fallback")
 
+    if forbidden := _check_authorization(event):
+        return forbidden
+
+    in_flight = _get_in_flight_count(queue_url)
+    
+    if _is_status_check(event):
+        return _status_response(in_flight)
+
+    if in_flight > 0:
+        return _busy_response(in_flight)
+
+    symbols = _get_symbols(bucket)
+    vix_spikes = _fetch_vix_spikes()
+    
+    run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    _send_batches(queue_url, run_id, symbols, vix_spikes, event.get("snapshot", False))
+
+    return _success_response(run_id, len(symbols), len(vix_spikes))
+
+
+def _check_authorization(event: dict) -> Optional[dict]:
+    dev_key = os.environ.get("DEV_KEY", "stonks-unconfigured-fallback")
     is_http = "requestContext" in event and "http" in event["requestContext"]
     if is_http and event.get("queryStringParameters", {}).get("dev_key") != dev_key:
         print(f"[orchestrator] Unauthorized HTTP access attempt")
         return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
+    return None
 
+
+def _get_in_flight_count(queue_url: str) -> int:
     attrs = sqs.get_queue_attributes(
         QueueUrl=queue_url,
         AttributeNames=[
@@ -36,31 +60,39 @@ def lambda_handler(event: dict, context: Any) -> dict:
         ],
     )
     attr_dict = attrs.get("Attributes", {})
-    in_flight = sum(int(attr_dict.get(k, 0)) for k in [
+    return sum(int(attr_dict.get(k, 0)) for k in [
         "ApproximateNumberOfMessages",
         "ApproximateNumberOfMessagesNotVisible",
         "ApproximateNumberOfMessagesDelayed",
     ])
-    
-    if is_http and event["requestContext"]["http"]["method"] == "GET":
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"running": in_flight > 0, "inFlight": in_flight})
-        }
 
-    if in_flight > 0:
-        msg = f"Scan already in progress (queue size: {in_flight})"
-        print(f"[orchestrator] {msg}")
-        return {"statusCode": 429, "body": json.dumps({"error": msg})}
 
+def _is_status_check(event: dict) -> bool:
+    is_http = "requestContext" in event and "http" in event["requestContext"]
+    return is_http and event["requestContext"]["http"]["method"] == "GET"
+
+
+def _status_response(in_flight: int) -> dict:
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({"running": in_flight > 0, "inFlight": in_flight})
+    }
+
+
+def _busy_response(in_flight: int) -> dict:
+    msg = f"Scan already in progress (queue size: {in_flight})"
+    print(f"[orchestrator] {msg}")
+    return {"statusCode": 429, "body": json.dumps({"error": msg})}
+
+
+def _get_symbols(bucket: str) -> list[str]:
     resp = s3.get_object(Bucket=bucket, Key="symbols/us-equities.txt")
     lines = resp["Body"].read().decode("utf-8").splitlines()
-    symbols = [line.strip() for line in lines if line.strip()]
+    return [line.strip() for line in lines if line.strip()]
 
-    vix_spikes = _fetch_vix_spikes()
-    snapshot = event.get("snapshot", False)
-    run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+def _send_batches(queue_url: str, run_id: str, symbols: list[str], vix_spikes: list[dict], snapshot: bool) -> None:
     batches = [symbols[i : i + BATCH_SIZE] for i in range(0, len(symbols), BATCH_SIZE)]
     total_batches = len(batches)
 
@@ -82,16 +114,19 @@ def lambda_handler(event: dict, context: Any) -> dict:
     for i in range(0, len(sqs_messages), 10):
         sqs.send_message_batch(QueueUrl=queue_url, Entries=sqs_messages[i : i + 10])
 
+
+def _success_response(run_id: str, symbol_count: int, spike_count: int) -> dict:
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps({
             "runId": run_id,
-            "totalSymbols": len(symbols),
-            "totalBatches": total_batches,
-            "vixSpikes": len(vix_spikes),
+            "totalSymbols": symbol_count,
+            "totalBatches": (symbol_count + BATCH_SIZE - 1) // BATCH_SIZE,
+            "vixSpikes": spike_count,
         }),
     }
+
 
 
 def _fetch_vix_spikes() -> list[dict]:
