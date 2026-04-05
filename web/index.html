@@ -996,8 +996,12 @@
 const MEGA_CAP = new Set(['AAPL','ABBV','ABT','ACN','ADBE','AMD','AMGN','AMZN','AVGO','AXP','BA','BAC','BRK-B','BX','CAT','CI','CMCSA','COP','COST','CRM','CRWD','CSCO','CVX','DE','DHR','DIS','ETN','GE','GEV','GILD','GOOG','GOOGL','GS','HD','HON','IBM','INTC','INTU','ISRG','JNJ','JPM','KO','LIN','LLY','LMT','LOW','MA','MCD','MDLZ','MRK','MS','MSFT','MU','NEE','NFLX','NKE','NOW','NVDA','ORCL','PEP','PFE','PG','PGR','PLTR','PM','PYPL','QCOM','RTX','SBUX','SCHW','SHW','SPGI','T','TJX','TMO','TMUS','TSLA','TXN','UNH','UNP','UPS','V','VRTX','VZ','WFC','WMT','XOM']);
 const MEGA_CAP_500B = new Set(['NVDA','AAPL','MSFT','AMZN','GOOGL','META','LLY','TSLA','BRK-B','AVGO','JPM','V','MA','COST','UNH','NFLX','WMT','ORCL','HD','ABBV','CRM','PFE','BAC','KO','PEP','TMUS','ADI','TMO','AMD','QCOM','LIN','ADBE','CSCO','NKE','GE','RTX','INTU','TXN','GEV','IBM','GS','AMGN','CAT','TJX','ISRG','BKNG','MU','PLTR','MS','HON','BX','AXP','SPGI','BLK','PM','ETN','REGN','SYK','CI','GILD','LMT','ADP','COP','CB','BSX','FI','MMC','MDLZ','KLAC','DE','VRTX','SCHW','AMT','UNP','ADI','PANW','ITW','HCA','PGR','SNPS','CDNS','MELI','CMG','MO','EMR']);
 
+const TOP_VOL = new Set(['SPY','QQQ','IWM','EEM','XLF','HYG','SMH','GDX','SLV','IBIT']);
+const SPDR = new Set(['SPY','GLD','SPLG','XLK','XLF','DIA','SPYG','BIL','XLV','XLE','SPDW','GLDM','SPYV','XLI','XLC','MDY','XLU','XLY','SDY','XLP','SPEM','SPMD','SPSM','SPTM','SPTL','SPIB','SPHY','SPTI','SPAB','SPSB','XBI','XLRE','JNK','SPYD','XLB','SPMB','XAR','SPTS','CWB','SRLN','FEZ','SJNK','GNR','XME','SLYV','SLYG','TOTL','BILS','KRE','SHM','TFI','HYMB','FLRN','MDYG','CWI','MDYV','XOP','KOMP','SPYX','EBND','SPBO','TIPX','RWR','XHB','XSD','BWX','QUS','XNTK','SPGM']);
+const VANGUARD = new Set(['VOO','VTI','VEA','VUG','VTV','BND','VXUS','VWO','VGT','VIG','VO','BNDX','VYM','VB','VCIT','VT','VEU','VV','BSV','VTEB','VCSH','VGIT','VONG','VNQ','VBR','VGK','MGK','BIV','VGSH','VXF','VOE','VOOG','VBK','VYMI','VOT','VHT','VONV','VTIP','VMBS','VTWO','VFH','MGV','VSS','ESGV','VGLT','MGC','VDE','VIGI','VPL','VPU','VDC','VUSB']);
+
 const TOP_AUM = new Set(['SPY','IVV','VOO','VTI','QQQ','VEA','VTV','IEFA','BND','AGG','VWO','IWM','IEMG','VIG','VUG','IJR','VXUS','GLD','IJH','SCHD','VGT','XLK','BNDX','VO','IWF','VCIT','XLV','ITOT','BSV','DIA']);
-const ALL_ETFS = new Set(['AFK', 'AGG', 'AGGY', 'AIQ', 'AIVL', 'ANGL', 'ARGT', 'ARKF', 'ARKG', 'ARKK', 'ARKQ', 'ARKW', 'AUSF', 'BBH', 'BIL', 'BILS', 'BITQ', 'BIV', 'BIZD', 'BKCH', 'BLOK', 'BND', 'BNDX', 'BOTZ', 'BSV', 'BTCW', 'BUG', 'BWX', 'CATH', 'CHAT', 'CHIQ', 'CIBR', 'CLIP', 'CLOB', 'CLOI', 'CLOU', 'CNCR', 'COPX', 'CQQQ', 'CRAK', 'CWB', 'CWI', 'CXSE', 'DAPP', 'DAX', 'DBA', 'DBC', 'DDLS', 'DDWM', 'DEM', 'DES', 'DEW', 'DFE', 'DFEN', 'DFJ', 'DGRE', 'DGRS', 'DGRW', 'DGS', 'DHS', 'DIA', 'DIM', 'DIV', 'DJIA', 'DLN', 'DLS', 'DNL', 'DOL', 'DON', 'DRIV', 'DTCR', 'DTD', 'DTH', 'DWM', 'DXJ', 'EBND', 'EEM', 'EES', 'EINC', 'ELD', 'EMBD', 'EMBX', 'EMLC', 'EMMF', 'EPI', 'EPS', 'ESGV', 'ESPO', 'ETHA', 'ETHV', 'EZM', 'FAN', 'FDIS', 'FDN', 'FEZ', 'FHLC', 'FINX', 'FLRN', 'FLTR', 'FTEC', 'GDE', 'GDMN', 'GDX', 'GDXJ', 'GLD', 'GLDM', 'GLIN', 'GNR', 'GOEX', 'GPZ', 'GREK', 'GRID', 'GRNB', 'GXIG', 'HACK', 'HAP', 'HEDJ', 'HODL', 'HYD', 'HYEM', 'HYG', 'HYMB', 'HYZD', 'IBB', 'IBIT', 'ICLN', 'IEFA', 'IEMG', 'IFRA', 'IGV', 'IHDG', 'IHF', 'IHI', 'IJH', 'IJR', 'IQDG', 'ISRA', 'ITA', 'ITB', 'ITM', 'ITOT', 'IVV', 'IWF', 'IWM', 'IYE', 'IYF', 'IYH', 'IYR', 'IYT', 'IYW', 'IYZ', 'IZRL', 'JETS', 'JNK', 'KBE', 'KIE', 'KOMP', 'KRE', 'KRMA', 'KWEB', 'LIT', 'MAGS', 'MDY', 'MDYG', 'MDYV', 'METV', 'MGC', 'MGK', 'MGV', 'MJ', 'MLN', 'MLPA', 'MLPX', 'MOAT', 'MOO', 'MORT', 'MOTI', 'MSOS', 'NLR', 'NORW', 'NTSI', 'NTSX', 'OIH', 'ONLN', 'ONOF', 'OUNZ', 'PAVE', 'PBE', 'PBW', 'PFFD', 'PFFV', 'PFXF', 'PHO', 'PIT', 'PJP', 'PPH', 'PPLT', 'PRNT', 'PSCT', 'PSI', 'QCLN', 'QDTE', 'QGRW', 'QHY', 'QQQ', 'QQQJ', 'QTEC', 'QUS', 'QYLD', 'QYLG', 'RAAX', 'RDTE', 'REMX', 'ROBO', 'RSSL', 'RTH', 'RWR', 'RYLD', 'SCHD', 'SDIV', 'SDY', 'SHLD', 'SHM', 'SHYD', 'SIL', 'SJNK', 'SKYY', 'SLV', 'SLX', 'SLYG', 'SLYV', 'SMB', 'SMH', 'SMHX', 'SMOG', 'SMOT', 'SNSR', 'SOXQ', 'SOXX', 'SPAB', 'SPBO', 'SPDW', 'SPEM', 'SPFF', 'SPGM', 'SPHY', 'SPIB', 'SPLG', 'SPMB', 'SPMD', 'SPSB', 'SPSM', 'SPTI', 'SPTL', 'SPTM', 'SPTS', 'SPY', 'SPYD', 'SPYG', 'SPYV', 'SPYX', 'SRET', 'SRLN', 'TAN', 'TFI', 'TIPX', 'TOTL', 'UNG', 'UNIY', 'URA', 'URNM', 'USDU', 'USFR', 'USMF', 'USO', 'VB', 'VBK', 'VBR', 'VCIT', 'VCSH', 'VDC', 'VDE', 'VEA', 'VEU', 'VFH', 'VGIT', 'VGK', 'VGLT', 'VGSH', 'VGT', 'VHT', 'VIG', 'VIGI', 'VMBS', 'VNM', 'VNQ', 'VO', 'VOE', 'VONG', 'VONV', 'VOO', 'VOOG', 'VOT', 'VPL', 'VPU', 'VSS', 'VT', 'VTEB', 'VTI', 'VTIP', 'VTV', 'VTWO', 'VUG', 'VUSB', 'VV', 'VWO', 'VXF', 'VXUS', 'VYM', 'VYMI', 'WCLD', 'WOOD', 'WTAI', 'WTMF', 'WTV', 'XAR', 'XBI', 'XDTE', 'XHB', 'XHE', 'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY', 'XME', 'XMPT', 'XNTK', 'XOP', 'XPAY', 'XRT', 'XSD', 'XSOE', 'XSW', 'XYLD', 'YBTC', 'YOLO', 'ZAP']);
+const ALL_ETFS = new Set([...TOP_AUM, ...TOP_VOL, ...SPDR, ...VANGUARD, ...VANECK_ETFS, ...WISDOMTREE_ETFS, ...GLOBALX_ETFS, ...ROUNDHILL_ETFS, ...COMMODITY_ETFS, ...SECTOR_ETFS]);
 const SPDR_SECTORS = new Set(['SPY','XLE','XLK','XLB','XLV','XLY','XLI','XLC','XLU','XLF','XLRE','XLP']);
 const INDEX_SYMBOLS = new Set(['SPY','QQQ','DIA','IWM']);
 const MAJOR_TARGETS = new Set([...INDEX_SYMBOLS, ...TOP_AUM, ...MEGA_CAP_500B]);
@@ -1728,36 +1732,44 @@ function updateRowCount(filteredCount, totalCount) {
 /* ── Main tab display ── */
 
 function renderSortableTable(tabId, cols) {
+  console.log('renderSortableTable: starting', tabId);
   const def = { cols };
   const allRows = state.data[tabId] || [];
   let rows = applyFilters([...allRows], cols);
   sortRows(rows);
 
   const totalSourced = allRows.filter(row => matchesSources(row.symbol)).length;
+  console.log('renderSortableTable: rows filtered', rows.length, 'total', totalSourced);
   renderToolbar(rows.length, totalSourced);
 
   const ths = renderTableHeader(def);
   const filterCells = renderFilterRow(def);
   const body = renderTbodyHTML(rows, cols, null, tabId);
 
-  document.getElementById('content').innerHTML =
+  console.log('renderSortableTable: updating innerHTML');
+  const contentEl = document.getElementById('content');
+  contentEl.innerHTML =
     `<div class="table-wrap"><table>` +
     `<thead><tr>${ths}</tr><tr class="filter-row">${filterCells}</tr></thead>` +
     `<tbody>${body}</tbody>` +
     `</table></div>`;
+  console.log('renderSortableTable: update complete, current innerHTML length:', contentEl.innerHTML.length);
 
   attachFilterListeners(def, tabId);
   attachShowAllListener(tabId);
 }
 
 function showTab(tabId) {
+  console.log('showTab: starting', tabId);
   const def = TAB_DEFS.find(t => t.id === tabId);
 
   if (def.special) {
+    console.log('showTab: rendering special tab', def.special);
     showSpecialTab(def);
     return;
   }
 
+  console.log('showTab: rendering sortable table');
   renderSortableTable(tabId, def.cols);
 }
 
@@ -1847,6 +1859,7 @@ function enrichRows(rows, t) {
 /* ── Meta ── */
 
 async function renderMeta(json) {
+  console.log('renderMeta: starting');
   if (json) state.latestJson = json;
   const currentJson = state.latestJson || {};
   
@@ -1868,12 +1881,14 @@ async function renderMeta(json) {
   } catch (err) { console.warn('[meta] symbol count fetch failed:', err.message); }
 
   const errStyle = errs ? ' style="color:var(--red)"' : '';
-  document.getElementById('meta').innerHTML =
+  const metaEl = document.getElementById('meta');
+  metaEl.innerHTML =
     `<span class="meta">Updated ${updatedText}</span>` +
     `<span class="meta-sep">|</span>` +
     `<span class="meta"><a href="/symbols/us-equities.txt" target="_blank" class="meta-link">${scanned}${total} symbols</a></span>` +
     `<span class="meta-sep">|</span>` +
     `<span class="meta"><a href="/results/latest-errors.json" target="_blank" class="meta-link"${errStyle}>${errs} errors</a></span>`;
+  console.log('renderMeta: update complete');
 }
 
 /* ── Week selector ── */
@@ -1962,8 +1977,11 @@ function showSpecialTab(def) {
 }
 
 function showSummaryDashboard(def) {
+  console.log('showSummaryDashboard: starting', def.id);
   const stats = Object.values(state.statsMap).filter(s => s.symbol && def.set.has(s.symbol));
+  console.log('showSummaryDashboard: found stats', stats.length);
   state.data[def.id] = enrichRows(stats, def);
+  console.log('showSummaryDashboard: enriched rows', state.data[def.id].length);
   renderSortableTable(def.id, def.cols);
 }
 
@@ -2213,6 +2231,7 @@ async function fetchAll(isSilentRefresh = false) {
     document.getElementById('content').innerHTML = '<div class="loading">Loading scan data&hellip;</div>';
   }
 
+  console.log('fetchAll: starting');
   const [manifestResult, statsResult, ...results] = await Promise.allSettled([
     fetch(`/results/manifest.json?${cb}`).then(r => {
       if (!r.ok) throw new Error(r.status);
@@ -2227,6 +2246,7 @@ async function fetchAll(isSilentRefresh = false) {
       return r.json();
     })),
   ]);
+  console.log('fetchAll: requests settled');
 
   if (manifestResult.status === 'fulfilled') {
     const mv = manifestResult.value;
@@ -2237,6 +2257,7 @@ async function fetchAll(isSilentRefresh = false) {
     state.statsMap = Object.fromEntries(statsResult.value.stats.map(s => [s.symbol, s]));
     if (statsResult.value.misc) state.statsMap._misc = statsResult.value.misc;
   }
+  console.log('fetchAll: statsMap built');
 
   const byUrl = {};
   urls.forEach((u, i) => {
@@ -2246,19 +2267,23 @@ async function fetchAll(isSilentRefresh = false) {
   const meta = byUrl[urls[0]] || byUrl[urls[1]] || byUrl[urls[2]];
   if (meta) renderMeta(meta);
 
+  console.log('fetchAll: calling populateTabData');
   populateTabData(byUrl);
+  console.log('fetchAll: populateTabData done');
 
   if (!Object.values(byUrl).length) {
     document.getElementById('content').innerHTML = '<div class="error-msg">Failed to load scan data.</div>';
     return;
   }
 
+  console.log('fetchAll: initializing UI');
   initDefaultFilters();
   renderSourceToggles();
   renderWeekSelector();
   renderTabs();
   writeHash();
   showTab(state.activeTab);
+  console.log('fetchAll: complete');
 }
 
 fetchAll();
