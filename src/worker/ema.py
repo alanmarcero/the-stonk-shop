@@ -22,93 +22,51 @@ def calculate(closes: list[float], period: int = DEFAULT_PERIOD) -> Optional[flo
 
 def detect_weekly_crossover(closes: list[float], period: int = DEFAULT_PERIOD) -> Optional[int]:
     """Detect if price just crossed above EMA. Returns weeks below before crossover, or None."""
-    if len(closes) < period + 1:
+    if (len(closes) < period + 1 or 
+        (ema_series := _build_ema_series(closes, period)) and
+        closes[period - 1 + (last_idx := len(ema_series) - 1)] <= ema_series[last_idx] * (1 + BUFFER) or
+        closes[period - 1 + last_idx - 1] > ema_series[last_idx - 1]):
         return None
 
-    ema_series = _build_ema_series(closes, period)
-    last_idx = len(ema_series) - 1
-    ema_offset = period - 1
-
-    if closes[ema_offset + last_idx] <= ema_series[last_idx] * (1 + BUFFER):
-        return None
-    
-    # Must have been below previously
-    if closes[ema_offset + last_idx - 1] > ema_series[last_idx - 1]:
-        return None
-
-    weeks_below = 0
-    for i in range(last_idx - 1, -1, -1):
-        if closes[ema_offset + i] > ema_series[i] * (1 + BUFFER):
-            break
-        weeks_below += 1
-
-    return weeks_below if weeks_below > 0 else None
+    return _count_consecutive(closes, ema_series, period - 1, last_idx - 1, lambda c, e: c <= e * (1 + BUFFER))
 
 
 def detect_weekly_crossdown(closes: list[float], period: int = DEFAULT_PERIOD) -> Optional[int]:
     """Detect if price just crossed below EMA. Returns weeks above before crossdown, or None."""
-    if len(closes) < period + 1:
+    if (len(closes) < period + 1 or
+        (ema_series := _build_ema_series(closes, period)) and
+        closes[period - 1 + (last_idx := len(ema_series) - 1)] >= ema_series[last_idx] * (1 - BUFFER) or
+        closes[period - 1 + last_idx - 1] < ema_series[last_idx - 1]):
         return None
 
-    ema_series = _build_ema_series(closes, period)
-    last_idx = len(ema_series) - 1
-    ema_offset = period - 1
-
-    if closes[ema_offset + last_idx] >= ema_series[last_idx] * (1 - BUFFER):
-        return None
-
-    # Must have been above previously
-    if closes[ema_offset + last_idx - 1] < ema_series[last_idx - 1]:
-        return None
-
-    weeks_above = 0
-    for i in range(last_idx - 1, -1, -1):
-        if closes[ema_offset + i] < ema_series[i] * (1 - BUFFER):
-            break
-        weeks_above += 1
-
-    return weeks_above if weeks_above > 0 else None
+    return _count_consecutive(closes, ema_series, period - 1, last_idx - 1, lambda c, e: c >= e * (1 - BUFFER))
 
 
 def count_periods_below(closes: list[float], period: int = DEFAULT_PERIOD) -> Optional[int]:
     """Count consecutive periods the price has been at or below EMA. Returns None if above."""
-    if len(closes) < period + 1:
+    if (len(closes) < period + 1 or
+        (ema_series := _build_ema_series(closes, period)) and
+        closes[period - 1 + (last_idx := len(ema_series) - 1)] > ema_series[last_idx] * (1 + BUFFER)):
         return None
 
-    ema_series = _build_ema_series(closes, period)
-    last_idx = len(ema_series) - 1
-    ema_offset = period - 1
-
-    # Stay "below" until price crosses the crossover threshold (> buffer above)
-    if closes[ema_offset + last_idx] > ema_series[last_idx] * (1 + BUFFER):
-        return None
-
-    weeks_below = 1
-    for i in range(last_idx - 1, -1, -1):
-        if closes[ema_offset + i] > ema_series[i] * (1 + BUFFER):
-            break
-        weeks_below += 1
-
-    return weeks_below
+    return _count_consecutive(closes, ema_series, period - 1, last_idx, lambda c, e: c <= e * (1 + BUFFER))
 
 
 def count_periods_above(closes: list[float], period: int = DEFAULT_PERIOD) -> Optional[int]:
     """Count consecutive periods the price has been above EMA. Returns None if at or below."""
-    if len(closes) < period + 1:
+    if (len(closes) < period + 1 or
+        (ema_series := _build_ema_series(closes, period)) and
+        closes[period - 1 + (last_idx := len(ema_series) - 1)] <= ema_series[last_idx] * (1 + BUFFER)):
         return None
 
-    ema_series = _build_ema_series(closes, period)
-    last_idx = len(ema_series) - 1
-    ema_offset = period - 1
+    return _count_consecutive(closes, ema_series, period - 1, last_idx, lambda c, e: c >= e * (1 - BUFFER))
 
-    # Must be decisively above EMA (> buffer) to enter "above" list
-    if closes[ema_offset + last_idx] <= ema_series[last_idx] * (1 + BUFFER):
-        return None
 
-    periods_above = 1
-    for i in range(last_idx - 1, -1, -1):
-        if closes[ema_offset + i] < ema_series[i] * (1 - BUFFER):
+def _count_consecutive(closes: list[float], ema_series: list[float], offset: int, start_idx: int, condition) -> int:
+    count = 0
+    for i in range(start_idx, -1, -1):
+        if not condition(closes[offset + i], ema_series[i]):
             break
-        periods_above += 1
+        count += 1
+    return count if count > 0 else 1 # Ensure at least 1 if we're calling this after initial checks
 
-    return periods_above
