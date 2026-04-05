@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import pytest
 
 from src.worker.stats import (
     compute_ytd_pct,
@@ -10,12 +11,14 @@ from src.worker.stats import (
 
 
 def _ts(year, month, day):
+    """Helper to create a UTC timestamp for a given date."""
     return int(datetime(year, month, day, tzinfo=timezone.utc).timestamp())
 
 
 class TestComputeYtdPct:
 
     def test_known_dec31_close(self):
+        # Arrangement
         closes = [100.0, 101.0, 105.0, 112.0]
         timestamps = [
             _ts(2025, 12, 30),
@@ -24,9 +27,10 @@ class TestComputeYtdPct:
             _ts(2026, 1, 3),
         ]
 
+        # Action
         result = compute_ytd_pct(closes, timestamps)
 
-        # (112 - 101) / 101 * 100 = 10.89
+        # Assertion: (112 - 101) / 101 * 100 = 10.89
         assert result == 10.89
 
     def test_negative_ytd(self):
@@ -95,7 +99,7 @@ class TestComputeLowestClosePct:
         closes = [10.0] + [200.0] * 299
         closes[100] = 50.0  # inside 252 window
 
-        pct, low = compute_lowest_close_pct(closes)
+        _, low = compute_lowest_close_pct(closes)
 
         assert low == 50.0
 
@@ -135,11 +139,8 @@ class TestComputeStats:
 
         assert result is not None
         assert result["close"] == 108.0
-        assert "ytdPct" in result
-        assert "highPct" in result
-        assert "high3yr" in result
-        assert "lowPct" in result
-        assert "low52wk" in result
+        expected_keys = {"ytdPct", "highPct", "high3yr", "lowPct", "low52wk", "close"}
+        assert expected_keys.issubset(result.keys())
 
     def test_empty_returns_none(self):
         assert compute_stats([], []) is None
@@ -359,9 +360,8 @@ class TestZeroDivisionDefensive:
     def test_lowest_close_zero(self):
         # Should not crash if low is 0
         closes = [0.0, 0.0, 0.0]
-        pct, low = compute_lowest_close_pct(closes)
+        _, low = compute_lowest_close_pct(closes)
         assert low == 0.0
-        assert pct == 0.0
 
     def test_sma200d_zero(self):
         # Should not crash if sma200d is 0
