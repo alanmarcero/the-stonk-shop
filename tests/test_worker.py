@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from src.worker.app import (
     lambda_handler,
     _process_batch,
+    _process_timeframe,
     _aggregate_to_monthly,
     _aggregate_to_quarterly,
     _ensure_one_candle_per_week,
@@ -403,3 +404,32 @@ class TestAggregateResultsStats:
         _aggregate_and_finalize("b", "r", 1)
         put_keys = [call[0][1] for call in mock_put.call_args_list]
         assert "results/latest-stats.json" in put_keys
+
+
+class TestProcessTimeframe:
+    def test_status_above_true_when_well_above(self, mock_worker_deps):
+        # 100 is EMA, 110 is close
+        closes = [100.0] * 5 + [110.0]
+        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        assert res["status"]["above"] is True
+        assert res["status"]["pctDiff"] > 0
+
+    def test_status_above_false_when_well_below(self, mock_worker_deps):
+        closes = [100.0] * 5 + [90.0]
+        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        assert res["status"]["above"] is False
+        assert res["status"]["pctDiff"] < 0
+
+    def test_status_above_true_even_within_buffer(self, mock_worker_deps):
+        # EMA will be 100. Price 101 is < 1.5% buffer but still > 100
+        closes = [100.0] * 5 + [101.0]
+        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        assert res["status"]["above"] is True
+        assert 0 < res["status"]["pctDiff"] <= 1.5
+
+    def test_status_above_false_even_within_buffer_below(self, mock_worker_deps):
+        # EMA will be 100. Price 99 is < 1.5% buffer but still < 100
+        closes = [100.0] * 5 + [99.0]
+        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        assert res["status"]["above"] is False
+        assert -1.5 <= res["status"]["pctDiff"] < 0
