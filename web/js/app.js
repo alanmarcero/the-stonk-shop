@@ -868,6 +868,7 @@ function enrichRows(rows, t) {
       lowPct: s.lowPct ?? null,
       rsi: s.rsi ?? null,
       forwardPE: s.forwardPE ?? null,
+      emaStatus: s.emaStatus || {},
       wkStatus: formatStatus(s.emaStatus?.weekly),
       moStatus: formatStatus(s.emaStatus?.monthly),
       qtrStatus: formatStatus(s.emaStatus?.quarterly),

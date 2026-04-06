@@ -276,7 +276,7 @@ def _process_timeframe(
         res["above"] = _entry(symbol, name, last_close, ema_value, a_count, "count", True)
 
     res["status"] = {
-        "above": (a_count > 0) if a_count else False,
+        "above": last_close > ema_value,
         "count": a_count or b_count or 0,
         "pctDiff": _pct_diff(last_close, ema_value)
     }
