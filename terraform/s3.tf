@@ -74,6 +74,10 @@ resource "aws_s3_bucket_policy" "cloudfront_access" {
         Resource = [
           "${aws_s3_bucket.scanner.arn}/results/*",
           "${aws_s3_bucket.scanner.arn}/app/*",
+          "${aws_s3_bucket.scanner.arn}/app/css/*",
+          "${aws_s3_bucket.scanner.arn}/app/js/*",
+          "${aws_s3_bucket.scanner.arn}/css/*",
+          "${aws_s3_bucket.scanner.arn}/js/*",
           "${aws_s3_bucket.scanner.arn}/symbols/*",
           "${aws_s3_bucket.scanner.arn}/favicon.ico",
         ]

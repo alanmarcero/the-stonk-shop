@@ -79,5 +79,10 @@ jobs:
           sed -i "s|__DEV_KEY__|${DEV_KEY}|g" ../web/index.html
           aws s3 cp ../symbols/us-equities.txt "s3://${BUCKET}/symbols/us-equities.txt" --content-type "text/plain"
           aws s3 cp ../web/index.html "s3://${BUCKET}/app/index.html" --content-type "text/html" --cache-control "no-cache"
+          aws s3 cp ../web/css "s3://${BUCKET}/css" --recursive --cache-control "max-age=3600"
+          aws s3 cp ../web/js "s3://${BUCKET}/js" --recursive --cache-control "max-age=3600"
+          # Also upload to app/ prefix just in case they are resolved relative to index.html
+          aws s3 cp ../web/css "s3://${BUCKET}/app/css" --recursive --cache-control "max-age=3600"
+          aws s3 cp ../web/js "s3://${BUCKET}/app/js" --recursive --cache-control "max-age=3600"
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
 
