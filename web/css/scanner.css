@@ -890,7 +890,8 @@
     th { padding: 6px 6px; font-size: 10px; }
     td { padding: 4px 6px; font-size: 11px; }
     td.symbol { max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
-    td.name, th.col-name, .filter-row td.col-name { display: none; }
+    td.name { max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+    th.col-name { min-width: 100px; }
     .col-ema { display: none; }
 
     /* 7. Filter row: compact, single-line filters */
@@ -929,6 +930,8 @@
     th { padding: 4px 4px; font-size: 9px; }
     td { padding: 3px 4px; }
     td.symbol { max-width: 72px; }
+    td.name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+    th.col-name { min-width: 80px; }
     .filter-row td { padding: 1px 1px; top: 23px; }
     .num-filter-group { height: 24px; }
     .spin-btn { width: 18px; font-size: 10px; }
