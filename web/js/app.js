@@ -197,20 +197,20 @@ function renderSourceToggles() {
 function matchesSources(symbol, row) {
   if (state.activeSourceMode === 'all') return true;
   if (state.activeSourceMode === 'none') return false;
-  for (const id of state.activeSourceMode) {
+  return [...state.activeSourceMode].some(id => {
     const def = SOURCE_DEFS[id];
-    if (def.match) { if (def.match(symbol, row)) return true; }
-    else if (def.set) { if (def.set.has(symbol)) return true; }
-  }
-  return false;
+    if (def.match) return def.match(symbol, row);
+    if (def.set) return def.set.has(symbol);
+    return false;
+  });
 }
 
 /* ── Default filters ── */
 
 function applyLowSignalFilters() {
-  for (const [c, def] of Object.entries(DEFAULT_FILTERS)) {
+  Object.entries(DEFAULT_FILTERS).forEach(([c, def]) => {
     state.filters[c] = { ...def };
-  }
+  });
 }
 
 function initDefaultFilters() {
@@ -265,9 +265,9 @@ function renderToolbar(filteredCount, totalCount) {
     if (state.lowSignalActive) {
       applyLowSignalFilters();
     } else {
-      for (const c of Object.keys(DEFAULT_FILTERS)) {
+      Object.keys(DEFAULT_FILTERS).forEach(c => {
         delete state.filters[c];
-      }
+      });
     }
     state.activeQuickFilters.clear();
     resetTabState();

@@ -91,13 +91,13 @@ def _get_symbols(bucket: str) -> list[dict]:
     lines = resp["Body"].read().decode("utf-8").splitlines()
     symbols = []
     for line in lines:
-        if not line.strip():
+        stripped = line.strip()
+        if not stripped:
             continue
-        parts = line.strip().split(",")
-        if len(parts) == 2:
-            symbols.append({"symbol": parts[0], "marketCap": int(parts[1])})
-        else:
-            symbols.append({"symbol": parts[0], "marketCap": 0})
+        parts = stripped.split(",")
+        symbol = parts[0]
+        market_cap = int(parts[1]) if len(parts) == 2 else 0
+        symbols.append({"symbol": symbol, "marketCap": market_cap})
     return symbols
 
 
