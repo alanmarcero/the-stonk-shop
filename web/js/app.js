@@ -1016,18 +1016,9 @@ function showMiscStats() {
   const misc = state.miscStats || {};
   document.getElementById('toolbar').innerHTML = '';
 
-  const sectorStats = Object.values(state.statsMap).filter(s => s.symbol && SPDR_SECTORS.has(s.symbol));
-  const indexStats = Object.values(state.statsMap).filter(s => s.symbol && INDEX_SYMBOLS.has(s.symbol));
-  const sectorNearHigh = sectorStats.length ? (sectorStats.filter(s => s.highPct != null && s.highPct >= -5).length / sectorStats.length * 100).toFixed(1) + '%' : '\u2014';
-  const indexNearHigh = indexStats.length ? (indexStats.filter(s => s.highPct != null && s.highPct >= -5).length / indexStats.length * 100).toFixed(1) + '%' : '\u2014';
-  const sectorPositiveYTD = sectorStats.length ? (sectorStats.filter(s => s.ytdPct != null && s.ytdPct >= 0).length / sectorStats.length * 100).toFixed(1) + '%' : '\u2014';
-
   const cards = [
     { label: 'Within 5% of High', value: misc.pctWithin5OfHigh != null ? misc.pctWithin5OfHigh.toFixed(1) + '%' : '\u2014' },
-    { label: 'Indexes Near High', value: indexNearHigh },
-    { label: 'Sectors Near High', value: sectorNearHigh },
     { label: 'Positive YTD', value: misc.pctPositiveYTD != null ? misc.pctPositiveYTD.toFixed(1) + '%' : '\u2014' },
-    { label: 'Sectors Positive YTD', value: sectorPositiveYTD },
     { label: 'Avg YTD', value: misc.avgYTD != null ? (misc.avgYTD > 0 ? '+' : '') + misc.avgYTD.toFixed(2) + '%' : '\u2014', color: misc.avgYTD != null ? (misc.avgYTD >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'Avg Fwd P/E', value: misc.avgForwardPE != null ? misc.avgForwardPE.toFixed(1) : '\u2014' },
     { label: 'Median Fwd P/E', value: misc.medianForwardPE != null ? misc.medianForwardPE.toFixed(1) : '\u2014' },
@@ -1039,23 +1030,38 @@ function showMiscStats() {
     { label: 'SPX Since Inauguration', value: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration > 0 ? '+' : '') + misc.spxSinceInauguration.toFixed(2) + '%' : '\u2014', color: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'SPX Since 2022 Bottom', value: misc.spxSinceBottom2022 != null ? (misc.spxSinceBottom2022 > 0 ? '+' : '') + misc.spxSinceBottom2022.toFixed(2) + '%' : '\u2014', color: misc.spxSinceBottom2022 != null ? (misc.spxSinceBottom2022 >= 0 ? 'var(--green)' : 'var(--red)') : null },
     { label: 'SPX Since ChatGPT', value: misc.spxSinceChatGPT != null ? (misc.spxSinceChatGPT > 0 ? '+' : '') + misc.spxSinceChatGPT.toFixed(2) + '%' : '\u2014', color: misc.spxSinceChatGPT != null ? (misc.spxSinceChatGPT >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'SPX 5Y', value: misc.spx5Y != null ? (misc.spx5Y > 0 ? '+' : '') + misc.spx5Y.toFixed(2) + '%' : '\u2014', color: misc.spx5Y != null ? (misc.spx5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
-
-    { label: 'QQQ 5Y', value: misc.qqq5Y != null ? (misc.qqq5Y > 0 ? '+' : '') + misc.qqq5Y.toFixed(2) + '%' : '\u2014', color: misc.qqq5Y != null ? (misc.qqq5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'DIA 5Y', value: misc.dia5Y != null ? (misc.dia5Y > 0 ? '+' : '') + misc.dia5Y.toFixed(2) + '%' : '\u2014', color: misc.dia5Y != null ? (misc.dia5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'IWM 5Y', value: misc.iwm5Y != null ? (misc.iwm5Y > 0 ? '+' : '') + misc.iwm5Y.toFixed(2) + '%' : '\u2014', color: misc.iwm5Y != null ? (misc.iwm5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'TMUS 5Y', value: misc.tmus5Y != null ? (misc.tmus5Y > 0 ? '+' : '') + misc.tmus5Y.toFixed(2) + '%' : '\u2014', color: misc.tmus5Y != null ? (misc.tmus5Y >= 0 ? 'var(--green)' : 'var(--red)') : null },
   ];
 
-  document.getElementById('content').innerHTML = `<div class="stat-grid">` +
+  let html = `<div class=\"stat-grid\">` +
     cards.map(c => {
-      const colorStyle = c.color ? ` style="color:${c.color}"` : '';
-      return `<div class="stat-card">` +
-        `<div class="stat-label">${c.label}</div>` +
-        `<div class="stat-value"${colorStyle}>${c.value}</div>` +
+      const colorStyle = c.color ? ` style=\"color:${c.color}\"` : '';
+      return `<div class=\"stat-card\">` +
+        `<div class=\"stat-label\">${c.label}</div>` +
+        `<div class=\"stat-value\"${colorStyle}>${c.value}</div>` +
         `</div>`;
     }).join('') +
     `</div>`;
+
+  if (misc.benchmarkByTicker) {
+    html += `<div class=\"stat-section-title\">Index & Sector Benchmarks</div>`;
+    html += `<div class=\"table-wrap benchmark-table\"><table><thead><tr><th>Symbol</th><th class=\"num\">YTD</th><th class=\"num\">1 Year</th><th class=\"num\">5 Year</th></tr></thead><tbody>`;
+    
+    Object.entries(misc.benchmarkByTicker).forEach(([sym, s]) => {
+      const ytdCls = s.ytd >= 0 ? 'pct-positive' : 'pct-negative';
+      const oneYCls = s.oneY >= 0 ? 'pct-positive' : 'pct-negative';
+      const fiveYCls = s.fiveY >= 0 ? 'pct-positive' : 'pct-negative';
+      
+      html += `<tr>` +
+        `<td class=\"symbol\">${sym}</td>` +
+        `<td class=\"num ${ytdCls}\">${s.ytd != null ? (s.ytd > 0 ? '+' : '') + s.ytd.toFixed(2) + '%' : '\u2014'}</td>` +
+        `<td class=\"num ${oneYCls}\">${s.oneY != null ? (s.oneY > 0 ? '+' : '') + s.oneY.toFixed(2) + '%' : '\u2014'}</td>` +
+        `<td class=\"num ${fiveYCls}\">${s.fiveY != null ? (s.fiveY > 0 ? '+' : '') + s.fiveY.toFixed(2) + '%' : '\u2014'}</td>` +
+        `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  document.getElementById('content').innerHTML = html;
 }
 
 function buildSpecialTabData() {

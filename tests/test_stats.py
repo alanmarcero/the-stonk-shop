@@ -127,19 +127,18 @@ class TestComputeLowestClosePct:
 class TestComputeStats:
 
     def test_returns_all_fields(self):
-        closes = [100.0, 105.0, 110.0, 108.0]
-        timestamps = [
-            _ts(2025, 12, 31),
-            _ts(2026, 1, 2),
-            _ts(2026, 1, 3),
-            _ts(2026, 1, 6),
-        ]
+        # Need 1260+ for 5Y, 252+ for 1Y
+        closes = [50.0] * 1300
+        closes[-1] = 60.0
+        timestamps = [i * 86400 for i in range(1300)]
 
         result = compute_stats(closes, timestamps)
 
         assert result is not None
-        assert result["close"] == 108.0
-        expected_keys = {"ytdPct", "highPct", "high3yr", "lowPct", "low52wk", "close"}
+        assert result["close"] == 60.0
+        assert result["return5Y"] == 20.0
+        assert result["return1Y"] == 20.0
+        expected_keys = {"ytdPct", "highPct", "high3yr", "lowPct", "low52wk", "close", "return1Y", "return5Y"}
         assert expected_keys.issubset(result.keys())
 
     def test_empty_returns_none(self):

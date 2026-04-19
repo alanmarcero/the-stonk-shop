@@ -416,11 +416,25 @@ def _add_index_benchmarks(misc: dict, all_stats: list[dict]) -> None:
         if "return5Y" in voo:
             misc["spx5Y"] = voo["return5Y"]
 
-    # Other major indices
-    for sym in ("QQQ", "DIA", "IWM", "TMUS"):
+    # Benchmark tickers to consolidate
+    bench_tickers = ("QQQ", "DIA", "IWM", "TMUS", "VTV", "SPY", "XLE", "XLK", "XLB", "XLV", "XLY", "XLI", "XLC", "XLU", "XLF", "XLRE", "XLP")
+    bench_data = {}
+
+    for sym in bench_tickers:
         entry = next((s for s in all_stats if s.get("symbol") == sym), None)
-        if entry and "return5Y" in entry:
-            misc[f"{sym.lower()}5Y"] = entry["return5Y"]
+        if entry:
+            ticker_stats = {
+                "ytd": entry.get("ytdPct"),
+                "oneY": entry.get("return1Y"),
+                "fiveY": entry.get("return5Y")
+            }
+            bench_data[sym] = ticker_stats
+            
+            # Legacy fields for backward compat
+            if ticker_stats["fiveY"] is not None:
+                misc[f"{sym.lower()}5Y"] = ticker_stats["fiveY"]
+
+    misc["benchmarkByTicker"] = bench_data
 
 
 

@@ -107,6 +107,12 @@ def compute_stats(
         smaw = round(sum(weekly_closes[-200:]) / 200, 2)
         stats_res.update({"sma200w": smaw, "pctSma200w": round((closes[-1] - smaw) / smaw * 100, 2) if smaw > 0 else 0.0})
 
+    # 1Y return (approx 252 days)
+    if len(closes) >= 252:
+        one_y_close = closes[-252]
+        if one_y_close > 0:
+            stats_res["return1Y"] = round((closes[-1] - one_y_close) / one_y_close * 100, 2)
+
     # 5Y return (approx 252 * 5 days)
     if len(closes) >= 1260:
         five_y_close = closes[-1260]
