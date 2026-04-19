@@ -62,6 +62,7 @@ const COL_LABELS = {
   quartersBelow: 'Quarters Below', quartersAbove: 'Quarters Above',
   count: 'Count',
   ytdPct: 'YTD', highPct: 'vs High', high3yr: '3yr High', lowPct: 'vs Low', low52wk: '52wk Low',
+  return1Y: '1 Year', return5Y: '5 Year',
   rsi: 'RSI', forwardPE: 'Fwd P/E', pctSma200d: '% 200D', pctSma200w: '% 200W',
   breakoutPct: 'Breakout %', breakdownPct: 'Breakdown %',
   breakoutPrice: 'Breakout', breakdownPrice: 'Breakdown',
@@ -84,7 +85,7 @@ const TAB_GROUPS = [
 const GROUPED_TAB_IDS = new Set(TAB_GROUPS.flatMap(g => g.tabs));
 const STANDALONE_TABS = TAB_DEFS.filter(t => !GROUPED_TAB_IDS.has(t.id));
 
-const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','pctSma200d','pctSma200w','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain']);
+const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','pctSma200d','pctSma200w','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain','return1Y','return5Y']);
 
 const state = {
   activeSourceMode: 'all',
@@ -792,7 +793,7 @@ function showTab(tabId) {
 }
 
 const SPECIAL_TAB_COLS = {
-  performance: ['symbol','close','ytdPct','highPct','lowPct','forwardPE','pctSma200d','pctSma200w'],
+  performance: ['symbol','close','ytdPct','return1Y','return5Y','highPct','lowPct','forwardPE','pctSma200d','pctSma200w'],
   priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct'],
 };
 
@@ -1075,8 +1076,8 @@ function buildSpecialTabData() {
   // Performance
   state.data['performance'] = stats.map(s => ({
     symbol: s.symbol, name: s.name || '', close: s.close ?? null,
-    ytdPct: s.ytdPct ?? null, highPct: s.highPct ?? null,
-    lowPct: s.lowPct ?? null,
+    ytdPct: s.ytdPct ?? null, return1Y: s.return1Y ?? null, return5Y: s.return5Y ?? null,
+    highPct: s.highPct ?? null, lowPct: s.lowPct ?? null,
     rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
     pctSma200d: s.pctSma200d ?? null, pctSma200w: s.pctSma200w ?? null,
   }));
