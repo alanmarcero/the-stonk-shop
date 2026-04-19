@@ -35,7 +35,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
     symbols = _get_symbols(bucket)
     vix_spikes = _fetch_vix_spikes()
     
-    run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    run_id = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     _send_batches(queue_url, run_id, symbols, vix_spikes, event.get("snapshot", False))
 
     return _success_response(run_id, len(symbols), len(vix_spikes))
@@ -101,7 +101,7 @@ def _get_symbols(bucket: str) -> list[dict]:
     return symbols
 
 
-def _send_batches(queue_url: str, run_id: str, symbols: list[str], vix_spikes: list[dict], snapshot: bool) -> None:
+def _send_batches(queue_url: str, run_id: str, symbols: list[dict], vix_spikes: list[dict], snapshot: bool) -> None:
     batches = [symbols[i : i + BATCH_SIZE] for i in range(0, len(symbols), BATCH_SIZE)]
     total_batches = len(batches)
 

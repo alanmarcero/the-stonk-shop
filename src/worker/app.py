@@ -309,6 +309,18 @@ def _all_batches_complete(bucket: str, run_id: str, total_batches: int) -> bool:
 
 
 def _aggregate_and_finalize(bucket: str, run_id: str, total: int, *, snapshot: bool = False) -> None:
+    # Use a lock file to ensure aggregation only happens once per unique run_id
+    lock_key = f"locks/{run_id}.lock"
+    if storage.object_exists(bucket, lock_key):
+        return
+    
+    try:
+        # Note: head_object + put_object is not atomic, but reduces races significantly 
+        # in this low-concurrency environment (max 5 workers).
+        storage.put_json(bucket, lock_key, {"triggeredAt": datetime.now(timezone.utc).isoformat()})
+    except:
+        return
+
     batch_data = [storage.read_json(bucket, f"batches/{run_id}/batch-{i:03d}.json") for i in range(total)]
     aggregated, total_symbols, total_errors = aggregator.aggregate_batches(batch_data)
     _write_results(bucket, aggregated, total_symbols, total_errors, snapshot=snapshot)
