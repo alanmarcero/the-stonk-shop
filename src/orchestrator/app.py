@@ -86,10 +86,19 @@ def _busy_response(in_flight: int) -> dict:
     return {"statusCode": 429, "body": json.dumps({"error": msg})}
 
 
-def _get_symbols(bucket: str) -> list[str]:
+def _get_symbols(bucket: str) -> list[dict]:
     resp = s3.get_object(Bucket=bucket, Key="symbols/us-equities.txt")
     lines = resp["Body"].read().decode("utf-8").splitlines()
-    return [line.strip() for line in lines if line.strip()]
+    symbols = []
+    for line in lines:
+        if not line.strip():
+            continue
+        parts = line.strip().split(",")
+        if len(parts) == 2:
+            symbols.append({"symbol": parts[0], "marketCap": int(parts[1])})
+        else:
+            symbols.append({"symbol": parts[0], "marketCap": 0})
+    return symbols
 
 
 def _send_batches(queue_url: str, run_id: str, symbols: list[str], vix_spikes: list[dict], snapshot: bool) -> None:

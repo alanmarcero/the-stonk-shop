@@ -128,12 +128,12 @@ def _entry(symbol: str, name: str, close: float, ema_val: float, val: int, key: 
     }
 
 
-def _process_batch(symbols: list[str], vix_spikes: Optional[list[dict]] = None) -> BatchResult:
+def _process_batch(symbols: list[dict], vix_spikes: Optional[list[dict]] = None) -> BatchResult:
     batch = BatchResult()
-    for i, symbol in enumerate(symbols):
+    for i, symbol_data in enumerate(symbols):
         if i > 0:
             time.sleep(RATE_LIMIT_DELAY)
-        _process_symbol(symbol, batch, vix_spikes)
+        _process_symbol(symbol_data, batch, vix_spikes)
     return batch
 
 
@@ -163,7 +163,10 @@ def _append_quarterly_results(batch: BatchResult, res: dict) -> None:
     if res.get("above"): batch.quarter_above.append(res["above"])
 
 
-def _process_symbol(symbol: str, batch: BatchResult, vix_spikes: Optional[list[dict]] = None) -> None:
+def _process_symbol(symbol_data: dict, batch: BatchResult, vix_spikes: Optional[list[dict]] = None) -> None:
+    symbol = symbol_data["symbol"]
+    market_cap = symbol_data.get("marketCap", 0)
+    
     weekly_result = yahoo.fetch_quarterly_candles(symbol)
     daily_result = yahoo.fetch_stats_candles(symbol)
 
@@ -184,12 +187,13 @@ def _process_symbol(symbol: str, batch: BatchResult, vix_spikes: Optional[list[d
     _append_quarterly_results(batch, quarterly)
 
     if daily_result is not None:
-        _process_stats_for_symbol(symbol, name, daily_result, weekly_result, batch, weekly, monthly, quarterly, vix_spikes)
+        _process_stats_for_symbol(symbol, name, market_cap, daily_result, weekly_result, batch, weekly, monthly, quarterly, vix_spikes)
 
 
 def _process_stats_for_symbol(
     symbol: str,
     name: str,
+    market_cap: int,
     daily_result: tuple,
     weekly_result: Optional[tuple],
     batch: BatchResult,
@@ -208,6 +212,7 @@ def _process_stats_for_symbol(
     computed.update({
         "symbol": symbol,
         "name": name,
+        "marketCap": market_cap,
         "emaStatus": {
             "weekly": weekly.get("status"),
             "monthly": monthly.get("status"),

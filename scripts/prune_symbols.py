@@ -32,9 +32,16 @@ MIN_AVG_VOLUME = 250_000
 MAX_WORKERS = 10
 
 
-def load_symbols() -> list[str]:
+def load_symbols() -> dict[str, str]:
+    symbol_data = {}
     with open(SYMBOLS_PATH) as f:
-        return [line.strip() for line in f if line.strip()]
+        for line in f:
+            if line.strip():
+                parts = line.strip().split(",")
+                s = parts[0]
+                cap = parts[1] if len(parts) > 1 else "0"
+                symbol_data[s] = cap
+    return symbol_data
 
 
 def fetch_failed_symbols(s3) -> set[str]:
@@ -84,7 +91,8 @@ def main():
     args = parser.parse_args()
 
     # Load current symbols
-    all_symbols = load_symbols()
+    symbol_data = load_symbols()
+    all_symbols = list(symbol_data.keys())
     print(f"Loaded {len(all_symbols)} symbols from {SYMBOLS_PATH}")
 
     # Fetch failed symbols from S3
@@ -138,7 +146,7 @@ def main():
     # Write pruned list
     with open(SYMBOLS_PATH, "w", newline="\n") as f:
         for symbol in pruned:
-            f.write(symbol + "\n")
+            f.write(f"{symbol},{symbol_data[symbol]}\n")
     print(f"\nWrote {len(pruned)} symbols to {SYMBOLS_PATH}")
 
     # Upload to S3

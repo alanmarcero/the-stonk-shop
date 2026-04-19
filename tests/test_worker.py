@@ -79,7 +79,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "Test Name")
         
-        result = _process_batch(["TEST"])
+        result = _process_batch([{"symbol": "TEST", "marketCap": 1000000}])
         
         assert len(result.crossovers) == 1
         assert result.crossovers[0]["symbol"] == "TEST"
@@ -89,7 +89,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "Apple Inc.")
         
-        result = _process_batch(["AAPL"])
+        result = _process_batch([{"symbol": "AAPL", "marketCap": 3000000000000}])
         
         entry = result.crossovers[0]
         expected_fields = {"symbol", "name", "close", "ema", "pctAbove", "weeksBelow"}
@@ -99,7 +99,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "X")
         
-        result = _process_batch(["X"])
+        result = _process_batch([{"symbol": "X", "marketCap": 0}])
         
         ema_val = result.crossovers[0]["ema"]
         assert ema_val == round(ema_val, 4)
@@ -108,7 +108,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (CROSSOVER_CLOSES, _timestamps_for(CROSSOVER_CLOSES), "X")
         
-        result = _process_batch(["X"])
+        result = _process_batch([{"symbol": "X", "marketCap": 0}])
         
         pct = result.crossovers[0]["pctAbove"]
         assert pct == round(pct, 2)
@@ -117,7 +117,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "Test Name")
         
-        result = _process_batch(["TEST"])
+        result = _process_batch([{"symbol": "TEST", "marketCap": 0}])
         
         assert len(result.week_below) == 1
         assert result.week_below[0]["count"] == 3
@@ -126,7 +126,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (BELOW_CLOSES, _timestamps_for(BELOW_CLOSES), "X")
         
-        result = _process_batch(["X"])
+        result = _process_batch([{"symbol": "X", "marketCap": 0}])
         
         expected_fields = {"symbol", "name", "close", "ema", "pctBelow", "count"}
         assert set(result.week_below[0].keys()) == expected_fields
@@ -136,7 +136,7 @@ class TestProcessBatch:
         short_below = [50.0, 52.0, 54.0, 56.0, 58.0, 56.0, 53.0]
         mock_yahoo.fetch_quarterly_candles.return_value = (short_below, _timestamps_for(short_below), "Test")
         
-        result = _process_batch(["TEST"])
+        result = _process_batch([{"symbol": "TEST", "marketCap": 0}])
         
         assert len(result.week_below) == 0
 
@@ -144,7 +144,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (UPTREND_CLOSES, _timestamps_for(UPTREND_CLOSES), "Bull")
         
-        result = _process_batch(["BULL"])
+        result = _process_batch([{"symbol": "BULL", "marketCap": 0}])
         
         assert len(result.crossovers) == 0
         assert len(result.week_below) == 0
@@ -153,7 +153,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = None
         
-        result = _process_batch(["FAIL"])
+        result = _process_batch([{"symbol": "FAIL", "marketCap": 0}])
         
         assert len(result.errors) == 1
 
@@ -161,7 +161,7 @@ class TestProcessBatch:
         mock_yahoo, mock_time, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "A")
         
-        _process_batch(["A", "B", "C"])
+        _process_batch([{"symbol": "A", "marketCap": 0}, {"symbol": "B", "marketCap": 0}, {"symbol": "C", "marketCap": 0}])
         
         assert mock_time.sleep.call_count == 2
 
@@ -169,7 +169,7 @@ class TestProcessBatch:
         mock_yahoo, mock_time, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = ([50.0] * 10, list(range(10)), "Only")
         
-        _process_batch(["ONLY"])
+        _process_batch([{"symbol": "ONLY", "marketCap": 0}])
         
         mock_time.sleep.assert_not_called()
 
@@ -184,7 +184,7 @@ class TestProcessBatch:
         mock_yahoo.fetch_stats_candles.return_value = ([100.0, 105.0], [1000, 2000], "AAPL")
         mock_stats.compute_stats.return_value = {"close": 105.0, "ytdPct": 5.0}
         
-        result = _process_batch(["AAPL"])
+        result = _process_batch([{"symbol": "AAPL", "marketCap": 0}])
         
         assert len(result.stats_data) == 1
         assert result.stats_data[0]["symbol"] == "AAPL"
@@ -193,7 +193,7 @@ class TestProcessBatch:
         mock_yahoo, _, _ = mock_worker_deps
         mock_yahoo.fetch_quarterly_candles.return_value = (CROSSDOWN_CLOSES, _timestamps_for(CROSSDOWN_CLOSES), "Test")
         
-        result = _process_batch(["TEST"])
+        result = _process_batch([{"symbol": "TEST", "marketCap": 0}])
         
         assert len(result.crossdowns) == 1
         assert result.crossdowns[0]["weeksAbove"] == 4
@@ -207,7 +207,7 @@ class TestProcessBatch:
         mock_stats.compute_stats.return_value = {"close": 105.0}
         mock_stats.compute_return_since.side_effect = [12.5, -3.0, 45.0, 60.0]
 
-        result = _process_batch(["VOO"])
+        result = _process_batch([{"symbol": "VOO", "marketCap": 0}])
 
         stats_res = result.stats_data[0]
         assert stats_res["spxSinceElection"] == 12.5
@@ -317,7 +317,7 @@ class TestLambdaHandler:
     def test_processes_sqs_message(self, mock_handler_deps):
         mock_process, mock_put, _, _, _ = mock_handler_deps
         mock_process.return_value = BatchResult()
-        event = self._sqs_event([{"runId": "r", "batchIndex": 0, "totalBatches": 3, "symbols": ["A"]}])
+        event = self._sqs_event([{"runId": "r", "batchIndex": 0, "totalBatches": 3, "symbols": [{"symbol": "A", "marketCap": 0}]}])
         
         lambda_handler(event, None)
         

@@ -104,7 +104,7 @@ class TestLambdaHandler:
         assert json.loads(result["body"])["totalSymbols"] == 3
         entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body_sent = json.loads(entries[0]["MessageBody"])
-        assert body_sent["symbols"] == ["AAPL", "MSFT", "GOOG"]
+        assert body_sent["symbols"] == [{"symbol": "AAPL", "marketCap": 0}, {"symbol": "MSFT", "marketCap": 0}, {"symbol": "GOOG", "marketCap": 0}]
 
     def test_run_id_is_date_format(self, mock_orchestrator_deps):
         mock_s3, _, _ = mock_orchestrator_deps
@@ -134,7 +134,7 @@ class TestLambdaHandler:
         assert json.loads(result["body"])["totalBatches"] == 1
         entries = mock_sqs.send_message_batch.call_args[1]["Entries"]
         body_sent = json.loads(entries[0]["MessageBody"])
-        assert body_sent["symbols"] == ["AAPL"]
+        assert body_sent["symbols"] == [{"symbol": "AAPL", "marketCap": 0}]
         assert body_sent["totalBatches"] == 1
 
     def test_message_has_no_sneak_peek(self, mock_orchestrator_deps):

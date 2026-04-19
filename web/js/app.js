@@ -4,8 +4,8 @@ const ETF_FILTERS = ['topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'van
 const SOURCE_DEFS = {
   all:        { label: 'All' },
   none:       { label: 'None' },
-  small:      { label: '$200B\u2212',  set: null, match: s => !MEGA_CAP.has(s) },
-  mega:       { label: '$200B+',       set: MEGA_CAP },
+  small:      { label: '$200B\u2212',  match: (s, r) => r.marketCap > 0 && r.marketCap < 200000000000 },
+  mega:       { label: '$200B+',       match: (s, r) => r.marketCap >= 200000000000 },
   topAUM:     { label: 'Top AUM',      set: TOP_AUM },
   topVol:     { label: 'Top Vol',      set: TOP_VOL },
   spdr:       { label: 'SPDR',         set: SPDR },
@@ -194,12 +194,12 @@ function renderSourceToggles() {
   updateSourceDrawerLabel();
 }
 
-function matchesSources(symbol) {
+function matchesSources(symbol, row) {
   if (state.activeSourceMode === 'all') return true;
   if (state.activeSourceMode === 'none') return false;
   for (const id of state.activeSourceMode) {
     const def = SOURCE_DEFS[id];
-    if (def.match) { if (def.match(symbol)) return true; }
+    if (def.match) { if (def.match(symbol, row)) return true; }
     else if (def.set) { if (def.set.has(symbol)) return true; }
   }
   return false;
@@ -330,7 +330,7 @@ function sortRows(rows) {
 
 function applyFilters(rows, cols) {
   return rows.filter(row => {
-    if (!matchesSources(row.symbol)) return false;
+    if (!matchesSources(row.symbol, row)) return false;
     for (const col of cols) {
       const filter = state.filters[col];
       if (!filter) continue;
@@ -868,6 +868,7 @@ function enrichRows(rows, t) {
       lowPct: s.lowPct ?? null,
       rsi: s.rsi ?? null,
       forwardPE: s.forwardPE ?? null,
+      marketCap: s.marketCap ?? null,
       emaStatus: s.emaStatus || {},
       wkStatus: formatStatus(s.emaStatus?.weekly),
       moStatus: formatStatus(s.emaStatus?.monthly),

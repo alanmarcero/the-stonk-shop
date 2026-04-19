@@ -49,13 +49,19 @@ def main():
         print(f"Error: {SYMBOLS_PATH} not found.")
         return
 
+    symbol_data = {}
     with open(SYMBOLS_PATH, "r") as f:
-        all_symbols = [line.strip() for line in f if line.strip()]
+        for line in f:
+            if line.strip():
+                parts = line.strip().split(",")
+                s = parts[0]
+                cap = parts[1] if len(parts) > 1 else "0"
+                symbol_data[s] = cap
 
+    all_symbols = list(symbol_data.keys())
     print(f"Loaded {len(all_symbols)} symbols.")
     print(f"Fetching current prices using {MAX_WORKERS} workers...")
 
-    results = {}
     failed = []
     cheap = []
     valid = []
@@ -73,10 +79,8 @@ def main():
                 failed.append(symbol)
             elif price < PRICE_THRESHOLD:
                 cheap.append(symbol)
-                results[symbol] = price
             else:
                 valid.append(symbol)
-                results[symbol] = price
 
             if done % 100 == 0:
                 elapsed = time.time() - start_time
@@ -96,7 +100,7 @@ def main():
 
     with open(SYMBOLS_PATH, "w", newline="\n") as f:
         for s in new_symbols:
-            f.write(s + "\n")
+            f.write(f"{s},{symbol_data[s]}\n")
 
     with open(CHEAP_SYMBOLS_LOG, "w") as f:
         json.dump({"cheap": cheap, "failed": failed}, f, indent=2)
