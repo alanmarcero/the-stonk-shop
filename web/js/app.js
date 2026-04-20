@@ -1080,6 +1080,7 @@ function buildSpecialTabData() {
     highPct: s.highPct ?? null, lowPct: s.lowPct ?? null,
     rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
     pctSma200d: s.pctSma200d ?? null, pctSma200w: s.pctSma200w ?? null,
+    marketCap: s.marketCap ?? null,
   }));
 
   // Price Breaks — single combined table
@@ -1090,6 +1091,7 @@ function buildSpecialTabData() {
       breakoutPrice: s.breakoutPrice ?? null, breakoutDate: s.breakoutDate ?? null, breakoutPct: s.breakoutPct ?? null,
       breakdownPrice: s.breakdownPrice ?? null, breakdownDate: s.breakdownDate ?? null, breakdownPct: s.breakdownPct ?? null,
       rsi: s.rsi ?? null,
+      marketCap: s.marketCap ?? null,
     }));
 
   // Quarterly — Since Quarter
@@ -1114,7 +1116,7 @@ function _buildQuarterlyData(stats, field, tabId) {
   const qKeys = sortQuarterKeys(qKeySet);
 
   state.data[tabId] = filtered.map(s => {
-    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null };
+    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null, marketCap: s.marketCap ?? null };
     qKeys.forEach(k => { row[k] = s[field][k] ?? null; });
     return row;
   });
@@ -1135,7 +1137,7 @@ function _buildForwardPEData(stats) {
   const qKeys = sortQuarterKeys(qKeySet);
 
   state.data['fwdPE'] = filtered.map(s => {
-    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, forwardPE: s.forwardPE ?? null };
+    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, forwardPE: s.forwardPE ?? null, marketCap: s.marketCap ?? null };
     qKeys.forEach(k => { row[k] = s.forwardPEHistory[k] ?? null; });
     return row;
   });
@@ -1168,7 +1170,7 @@ function _buildVixSpikeData(stats) {
   spikeDates.sort((a, b) => parseMDYY(b) - parseMDYY(a));
 
   state.data['vixSpikes'] = filtered.map(s => {
-    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null };
+    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null, marketCap: s.marketCap ?? null };
     const gainByDate = {};
     s.vixReturns.forEach(ret => { gainByDate[ret.dateString] = ret.pctGain; });
     spikeDates.forEach(dateStr => { row['spike_' + dateStr] = gainByDate[dateStr] ?? null; });
