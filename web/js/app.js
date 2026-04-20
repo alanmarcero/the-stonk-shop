@@ -441,9 +441,9 @@ function getTabCount(t) {
   if (t.id === 'miscStats') return '';
   if (t.special) {
     const rows = state.data[t.id] || [];
-    return `${rows.filter(r => matchesSources(r.symbol)).length}`;
+    return `${rows.filter(r => matchesSources(r.symbol, r)).length}`;
   }
-  const total = state.data[t.id] ? state.data[t.id].filter(r => matchesSources(r.symbol)).length : 0;
+  const total = state.data[t.id] ? state.data[t.id].filter(r => matchesSources(r.symbol, r)).length : 0;
   const filtered = state.data[t.id] ? applyFilters(state.data[t.id], t.cols).length : 0;
   const isActive = t.id === state.activeTab;
   const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
@@ -805,7 +805,7 @@ function updateRows(tabId) {
   let rows = applyFilters([...allRows], cols);
   sortRows(rows);
 
-  const totalSourced = allRows.filter(r => matchesSources(r.symbol)).length;
+  const totalSourced = allRows.filter(r => matchesSources(r.symbol, r)).length;
   if (!updateRowCount(rows.length, totalSourced)) renderToolbar(rows.length, totalSourced);
 
   const tbody = document.querySelector('.table-wrap tbody');
