@@ -885,7 +885,7 @@
     /* 5. Content area: minimal padding */
     .content { padding: 4px 0 16px; }
 
-    /* 6. Table: compact rows, hide Name + EMA columns */
+    /* 6. Table: compact rows, hide EMA column */
     table { font-size: 11px; }
     th { padding: 6px 6px; font-size: 10px; }
     td { padding: 4px 6px; font-size: 11px; }
