@@ -32,8 +32,8 @@ const DEFAULT_FILTERS = {
 };
 
 const TAB_DEFS = [
-  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
-  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
+  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','name','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
+  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','name','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
   { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','name','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
   { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
   { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
