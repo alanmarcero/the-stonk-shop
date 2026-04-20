@@ -117,10 +117,11 @@ def _pct_diff(close: float, ema_value: float) -> float:
     return round((close - ema_value) / ema_value * 100, 2)
 
 
-def _entry(symbol: str, name: str, close: float, ema_val: float, val: int, key: str, is_above: bool) -> dict:
+def _entry(symbol: str, name: str, market_cap: int, close: float, ema_val: float, val: int, key: str, is_above: bool) -> dict:
     return {
         "symbol": symbol,
         "name": name,
+        "marketCap": market_cap,
         "close": close,
         "ema": round(ema_val, 4),
         "pctAbove" if is_above else "pctBelow": _pct_diff(close, ema_val) if is_above else _pct_diff(ema_val, close),
@@ -177,13 +178,13 @@ def _process_symbol(symbol_data: dict, batch: BatchResult, vix_spikes: Optional[
 
     name = weekly_result[2] if weekly_result else daily_result[2]
 
-    weekly = _process_timeframe(symbol, name, weekly_result, "weeksBelow", "weeksAbove", min_below=MIN_WEEKS_THRESHOLD)
+    weekly = _process_timeframe(symbol, name, market_cap, weekly_result, "weeksBelow", "weeksAbove", min_below=MIN_WEEKS_THRESHOLD)
     _append_timeframe_results(batch, weekly)
 
-    monthly = _process_timeframe(symbol, name, weekly_result, "monthsBelow", "monthsAbove", aggregate_fn=_aggregate_to_monthly)
+    monthly = _process_timeframe(symbol, name, market_cap, weekly_result, "monthsBelow", "monthsAbove", aggregate_fn=_aggregate_to_monthly)
     _append_monthly_results(batch, monthly)
 
-    quarterly = _process_timeframe(symbol, name, weekly_result, "quartersBelow", "quartersAbove", aggregate_fn=_aggregate_to_quarterly)
+    quarterly = _process_timeframe(symbol, name, market_cap, weekly_result, "quartersBelow", "quartersAbove", aggregate_fn=_aggregate_to_quarterly)
     _append_quarterly_results(batch, quarterly)
 
     if daily_result is not None:
@@ -242,6 +243,7 @@ def _add_special_stats(symbol: str, computed: dict, daily_result: tuple, weekly_
 def _process_timeframe(
     symbol: str,
     name: str,
+    market_cap: int,
     candle_result: Optional[tuple[list[float], list[int], str]],
     cross_up_key: str,
     cross_down_key: str,
@@ -269,16 +271,16 @@ def _process_timeframe(
     res = empty.copy()
 
     if (p_below := ema.detect_weekly_crossover(closes)) is not None:
-        res["crossover"] = _entry(symbol, name, last_close, ema_value, p_below, cross_up_key, True)
+        res["crossover"] = _entry(symbol, name, market_cap, last_close, ema_value, p_below, cross_up_key, True)
 
     if (p_above := ema.detect_weekly_crossdown(closes)) is not None:
-        res["crossdown"] = _entry(symbol, name, last_close, ema_value, p_above, cross_down_key, False)
+        res["crossdown"] = _entry(symbol, name, market_cap, last_close, ema_value, p_above, cross_down_key, False)
 
     if (b_count := ema.count_periods_below(closes)) is not None and b_count >= min_below:
-        res["below"] = _entry(symbol, name, last_close, ema_value, b_count, "count", False)
+        res["below"] = _entry(symbol, name, market_cap, last_close, ema_value, b_count, "count", False)
 
     if (a_count := ema.count_periods_above(closes)) is not None:
-        res["above"] = _entry(symbol, name, last_close, ema_value, a_count, "count", True)
+        res["above"] = _entry(symbol, name, market_cap, last_close, ema_value, a_count, "count", True)
 
     res["status"] = {
         "above": last_close > ema_value,

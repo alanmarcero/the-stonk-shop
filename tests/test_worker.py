@@ -8,6 +8,7 @@ from src.worker.app import (
     lambda_handler,
     _process_batch,
     _process_timeframe,
+    _entry,
     _aggregate_to_monthly,
     _aggregate_to_quarterly,
     _ensure_one_candle_per_week,
@@ -92,7 +93,7 @@ class TestProcessBatch:
         result = _process_batch([{"symbol": "AAPL", "marketCap": 3000000000000}])
         
         entry = result.crossovers[0]
-        expected_fields = {"symbol", "name", "close", "ema", "pctAbove", "weeksBelow"}
+        expected_fields = {"symbol", "name", "marketCap", "close", "ema", "pctAbove", "weeksBelow"}
         assert set(entry.keys()) == expected_fields
 
     def test_crossover_ema_rounded_to_4_decimals(self, mock_worker_deps):
@@ -128,7 +129,7 @@ class TestProcessBatch:
         
         result = _process_batch([{"symbol": "X", "marketCap": 0}])
         
-        expected_fields = {"symbol", "name", "close", "ema", "pctBelow", "count"}
+        expected_fields = {"symbol", "name", "marketCap", "close", "ema", "pctBelow", "count"}
         assert set(result.week_below[0].keys()) == expected_fields
 
     def test_week_below_not_detected_under_threshold(self, mock_worker_deps):
@@ -406,30 +407,41 @@ class TestAggregateResultsStats:
         assert "results/latest-stats.json" in put_keys
 
 
+class TestEntry:
+    def test_entry_fields(self):
+        e = _entry("AAPL", "Apple", 3000000000, 150.0, 145.0, 10, "weeksBelow", True)
+        assert e["symbol"] == "AAPL"
+        assert e["marketCap"] == 3000000000
+        assert e["close"] == 150.0
+        assert e["pctAbove"] == 3.45
+
+
 class TestProcessTimeframe:
     def test_status_above_true_when_well_above(self, mock_worker_deps):
         # 100 is EMA, 110 is close
         closes = [100.0] * 5 + [110.0]
-        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        res = _process_timeframe("TEST", "Test", 1000, (closes, _timestamps_for(closes), "Test"), "up", "down")
         assert res["status"]["above"] is True
         assert res["status"]["pctDiff"] > 0
+        assert res["above"]["marketCap"] == 1000
 
     def test_status_above_false_when_well_below(self, mock_worker_deps):
         closes = [100.0] * 5 + [90.0]
-        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        res = _process_timeframe("TEST", "Test", 2000, (closes, _timestamps_for(closes), "Test"), "up", "down")
         assert res["status"]["above"] is False
         assert res["status"]["pctDiff"] < 0
+        assert res["below"]["marketCap"] == 2000
 
     def test_status_above_true_even_within_buffer(self, mock_worker_deps):
         # EMA will be 100. Price 101 is < 1.5% buffer but still > 100
         closes = [100.0] * 5 + [101.0]
-        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        res = _process_timeframe("TEST", "Test", 3000, (closes, _timestamps_for(closes), "Test"), "up", "down")
         assert res["status"]["above"] is True
         assert 0 < res["status"]["pctDiff"] <= 1.5
 
     def test_status_above_false_even_within_buffer_below(self, mock_worker_deps):
         # EMA will be 100. Price 99 is < 1.5% buffer but still < 100
         closes = [100.0] * 5 + [99.0]
-        res = _process_timeframe("TEST", "Test", (closes, _timestamps_for(closes), "Test"), "up", "down")
+        res = _process_timeframe("TEST", "Test", 4000, (closes, _timestamps_for(closes), "Test"), "up", "down")
         assert res["status"]["above"] is False
         assert -1.5 <= res["status"]["pctDiff"] < 0
