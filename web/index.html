@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMA Scanner</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83D\uDCC8</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/scanner.css">
+</head>
+<body>
+
+<div class="banner">
+  <h1>EMA Scanner</h1>
+  <div id="meta"></div>
+  <button id="run-scan-btn" class="quick-btn" style="margin-left: auto;">Run Scan</button>
+</div>
+
+<div class="tabs" id="tabs"></div>
+<button class="source-drawer-toggle" id="source-drawer-toggle">
+  Filters <span class="chevron">&#9660;</span>
+  <span class="active-label" id="source-drawer-label"></span>
+</button>
+<div class="source-toggles" id="source-toggles"></div>
+<div class="source-toggles" id="week-selector" style="display:none"></div>
+<div class="sheet-overlay" id="tab-sheet-overlay">
+  <div class="sheet" id="tab-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="tab-sheet-title"></div>
+    <div id="tab-sheet-items"></div>
+  </div>
+</div>
+<div class="toolbar" id="toolbar"></div>
+<div class="content" id="content">
+  <div class="loading">Loading scan data&hellip;</div>
+</div>
+
+<script src="js/symbols.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
+</body>
+</html>
