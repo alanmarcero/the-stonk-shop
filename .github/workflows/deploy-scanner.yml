@@ -1,0 +1,88 @@
+name: Deploy AWS EMA Scanner
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-scanner
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install pytest boto3
+
+      - name: Run tests
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: python -m pytest tests/ -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_dev_key: ${{ secrets.DEV_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          cd terraform
+          terraform init \
+            -backend-config="bucket=ema-scanner-tf-state" \
+            -backend-config="region=us-east-1"
+
+      - name: Terraform plan
+        run: |
+          cd terraform
+          terraform import aws_cloudwatch_log_group.orchestrator /aws/lambda/ema-scanner-orchestrator || true
+          terraform import aws_cloudwatch_log_group.worker /aws/lambda/ema-scanner-worker || true
+          terraform plan -out=tfplan
+
+      - name: Terraform apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve tfplan
+
+      - name: Deploy symbols and web dashboard
+        run: |
+          cd terraform
+          BUCKET=$(terraform output -raw bucket_name)
+          DIST_ID=$(terraform output -raw cloudfront_distribution_id)
+          ORCHESTRATOR_URL=$(terraform output -raw orchestrator_url || echo "")
+          DEV_KEY=$(terraform output -raw dev_key || echo "stonks")
+          sed -i "s|__ORCHESTRATOR_URL__|${ORCHESTRATOR_URL}|g" ../web/index.html ../web/js/app.js
+          sed -i "s|__DEV_KEY__|${DEV_KEY}|g" ../web/index.html ../web/js/app.js
+          aws s3 cp ../symbols/us-equities.txt "s3://${BUCKET}/symbols/us-equities.txt" --content-type "text/plain"
+          aws s3 cp ../web/index.html "s3://${BUCKET}/app/index.html" --content-type "text/html" --cache-control "no-cache"
+          aws s3 cp ../web/css "s3://${BUCKET}/css" --recursive --cache-control "max-age=3600"
+          aws s3 cp ../web/js "s3://${BUCKET}/js" --recursive --cache-control "max-age=3600"
+          # Also upload to app/ prefix just in case they are resolved relative to index.html
+          aws s3 cp ../web/css "s3://${BUCKET}/app/css" --recursive --cache-control "max-age=3600"
+          aws s3 cp ../web/js "s3://${BUCKET}/app/js" --recursive --cache-control "max-age=3600"
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+

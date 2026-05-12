@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.terraform/
+*.tfplan
+tfplan
+.terraform.lock.hcl
+
+# AI agent local settings (never commit — may contain absolute paths / personal info)
+.claude/settings.local.json
+.claude/settings.local.*
+.gemini/settings.local.*
+*.local.json
+
+# Scratch / one-off debug scripts
+*.remote
+temp_*.py
+investigate*.py
+dump_*.py
+check_*_precise.py
+verify_*_precise.py
+verify_crossovers.py
+dashboard_verify.png
