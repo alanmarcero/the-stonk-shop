@@ -757,7 +757,7 @@ function renderSortableTable(tabId, cols) {
   let rows = applyFilters([...allRows], cols);
   sortRows(rows);
 
-  const totalSourced = allRows.filter(row => matchesSources(row.symbol)).length;
+  const totalSourced = allRows.filter(row => matchesSources(row.symbol, row)).length;
   console.log('renderSortableTable: rows filtered', rows.length, 'total', totalSourced);
   renderToolbar(rows.length, totalSourced);
 

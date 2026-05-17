@@ -88,10 +88,11 @@ def _aggregate_to_monthly(closes: list[float], timestamps: list[int]) -> list[fl
         return []
 
     now = datetime.now(timezone.utc)
+    now_month = (now.year, now.month)
     monthly = {
         (dt.year, dt.month): close
         for close, ts in zip(closes, timestamps)
-        if (dt := datetime.fromtimestamp(ts, tz=timezone.utc)).year < now.year or dt.month < now.month
+        if (dt := datetime.fromtimestamp(ts, tz=timezone.utc)) and (dt.year, dt.month) < now_month
     }
     return [monthly[k] for k in sorted(monthly.keys())]
 
@@ -102,11 +103,11 @@ def _aggregate_to_quarterly(closes: list[float], timestamps: list[int]) -> list[
         return []
 
     now = datetime.now(timezone.utc)
-    now_q = (now.month - 1) // 3 + 1
+    now_q = (now.year, (now.month - 1) // 3 + 1)
     quarterly = {
         (dt.year, (dt.month - 1) // 3 + 1): close
         for close, ts in zip(closes, timestamps)
-        if (dt := datetime.fromtimestamp(ts, tz=timezone.utc)).year < now.year or (dt.month - 1) // 3 + 1 < now_q
+        if (dt := datetime.fromtimestamp(ts, tz=timezone.utc)) and (dt.year, (dt.month - 1) // 3 + 1) < now_q
     }
     return [quarterly[k] for k in sorted(quarterly.keys())]
 
@@ -320,7 +321,8 @@ def _aggregate_and_finalize(bucket: str, run_id: str, total: int, *, snapshot: b
         # Note: head_object + put_object is not atomic, but reduces races significantly 
         # in this low-concurrency environment (max 5 workers).
         storage.put_json(bucket, lock_key, {"triggeredAt": datetime.now(timezone.utc).isoformat()})
-    except:
+    except Exception as err:
+        print(f"[worker] Failed to acquire aggregation lock: {err}")
         return
 
     batch_data = [storage.read_json(bucket, f"batches/{run_id}/batch-{i:03d}.json") for i in range(total)]
