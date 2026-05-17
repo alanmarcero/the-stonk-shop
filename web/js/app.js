@@ -1,1312 +1,1075 @@
-const CAP_FILTERS = ['all', 'small', 'mega'];
-const ETF_FILTERS = ['topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'commodities', 'sector'];
+/* ─────────────────────────────────────────────
+   STONK SHOP — Pulse · Crosses · More
+   ───────────────────────────────────────────── */
 
-const SOURCE_DEFS = {
-  all:        { label: 'All' },
-  none:       { label: 'None' },
-  small:      { label: '$200B\u2212',  match: (s, r) => r.marketCap > 0 && r.marketCap < 200000000000 },
-  mega:       { label: '$200B+',       match: (s, r) => r.marketCap >= 200000000000 },
-  topAUM:     { label: 'Top AUM',      set: TOP_AUM },
-  topVol:     { label: 'Top Vol',      set: TOP_VOL },
-  spdr:       { label: 'SPDR',         set: SPDR },
-  spdrSectors:{ label: 'Sectors',     set: SPDR_SECTORS },
-  vanguard:   { label: 'Vanguard',     set: VANGUARD },
-  vaneck:     { label: 'VanEck',       set: VANECK_ETFS },
-  commodities:{ label: 'Commodities', set: COMMODITY_ETFS },
-  sector:     { label: 'Other ETFs',   set: SECTOR_ETFS },
+const ORCHESTRATOR_URL = '__ORCHESTRATOR_URL__';
+const DEV_KEY = '__DEV_KEY__';
+
+const VIEWS = ['pulse', 'crosses', 'more'];
+
+const DEFAULT_WATCHLIST = ['IBIT', 'TMUS', 'SPY', 'QQQ', 'XLE', 'OIH'];
+
+const SECTOR_ORDER = ['SPY','XLK','XLE','XLF','XLV','XLY','XLI','XLC','XLU','XLP','XLB','XLRE'];
+const SECTOR_NAMES = {
+  SPY:  'S&P 500',
+  QQQ:  'Nasdaq 100',
+  DIA:  'Dow 30',
+  IWM:  'Russell 2000',
+  VTV:  'Large-Cap Value',
+  TMUS: 'T-Mobile',
+  XLK:  'Technology',
+  XLE:  'Energy',
+  XLF:  'Financials',
+  XLV:  'Healthcare',
+  XLY:  'Consumer Discr.',
+  XLI:  'Industrials',
+  XLC:  'Communications',
+  XLU:  'Utilities',
+  XLP:  'Consumer Staples',
+  XLB:  'Materials',
+  XLRE: 'Real Estate',
 };
 
-const SOURCE_ORDER = ['all', 'none', 'small', 'mega', 'topAUM', 'topVol', 'spdr', 'spdrSectors', 'vanguard', 'vaneck', 'commodities', 'sector'];
-
-const DEFAULT_FILTERS = {
-  close: { min: 10 },
-  count: { min: 5 },
-  weeksBelow: { min: 6 },
-  weeksAbove: { min: 5 },
-  monthsBelow: { min: 4 },
-  monthsAbove: { min: 3 },
-  pct: { min: 3 },
-  wkStatus: { above: true, below: true, ontop: true },
-  moStatus: { above: true, below: true, ontop: true },
-  qtrStatus: { above: true, below: true, ontop: true },
+const FILES = {
+  weekly:    { up: '/results/latest.json',                       upKey: 'crossovers',      down: '/results/latest-crossdown.json',           downKey: 'crossdowns',      above: '/results/latest-above.json',                aboveKey: 'weekAbove', below: '/results/latest-below.json', belowKey: 'weekBelow' },
+  monthly:   { up: '/results/latest-monthly.json',               upKey: 'monthCrossovers', down: '/results/latest-monthly.json',             downKey: 'monthCrossdowns', above: '/results/latest-monthly-below-above.json',  aboveKey: 'monthAbove', below: '/results/latest-monthly-below-above.json', belowKey: 'monthBelow' },
+  quarterly: { up: '/results/latest-quarterly.json',             upKey: 'quarterCrossovers', down: '/results/latest-quarterly.json',         downKey: 'quarterCrossdowns', above: '/results/latest-quarterly-below-above.json', aboveKey: 'quarterAbove', below: '/results/latest-quarterly-below-above.json', belowKey: 'quarterBelow' },
 };
 
-const TAB_DEFS = [
-  { id: 'etfDashboard', label: 'ETF Dashboard', special: 'summary', set: ALL_ETFS, cols: ['symbol','name','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
-  { id: 'megaDashboard', label: 'Mega Cap Dashboard', special: 'summary', set: MAJOR_TARGETS, cols: ['symbol','name','close','ytdPct','highPct','lowPct','wkStatus','moStatus','qtrStatus'] },
-  { id: 'crossovers',  label: 'Wk Cross Up',   file: '/results/latest.json',                      key: 'crossovers',      cols: ['symbol','name','close','weeksBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctAbove' },
-  { id: 'crossdowns',  label: 'Wk Cross Down',  file: '/results/latest-crossdown.json',             key: 'crossdowns',      cols: ['symbol','name','close','weeksAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],   pctField: 'pctBelow' },
-  { id: 'weekBelow',   label: 'Wk Below',       file: '/results/latest-below.json',                 key: 'weekBelow',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'weekAbove',   label: 'Wk Above',       file: '/results/latest-above.json',                 key: 'weekAbove',       cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'moCrossUp',   label: 'Mo Cross Up',    file: '/results/latest-monthly.json',               key: 'monthCrossovers', cols: ['symbol','name','close','monthsBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctAbove' },
-  { id: 'moCrossDown', label: 'Mo Cross Down',  file: '/results/latest-monthly.json',               key: 'monthCrossdowns', cols: ['symbol','name','close','monthsAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],  pctField: 'pctBelow' },
-  { id: 'moBelow',     label: 'Mo Below',       file: '/results/latest-monthly-below-above.json',   key: 'monthBelow',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'moAbove',     label: 'Mo Above',       file: '/results/latest-monthly-below-above.json',   key: 'monthAbove',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'qCrossUp',   label: 'Q Cross Up',     file: '/results/latest-quarterly.json',              key: 'quarterCrossovers', cols: ['symbol','name','close','quartersBelow','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctAbove' },
-  { id: 'qCrossDown', label: 'Q Cross Down',   file: '/results/latest-quarterly.json',              key: 'quarterCrossdowns', cols: ['symbol','name','close','quartersAbove','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'], pctField: 'pctBelow' },
-  { id: 'qBelow',     label: 'Q Below',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterBelow',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctBelow' },
-  { id: 'qAbove',     label: 'Q Above',        file: '/results/latest-quarterly-below-above.json',  key: 'quarterAbove',      cols: ['symbol','name','close','count','pct','ema','ytdPct','highPct','lowPct','rsi','forwardPE'],        pctField: 'pctAbove' },
-  { id: 'performance', label: 'YTD Stats',        special: 'performance' },
-  { id: 'priceBreaks', label: 'Price Breaks',   special: 'priceBreaks' },
-  { id: 'sinceQ',      label: 'Since Quarter',  special: 'sinceQuarter' },
-  { id: 'duringQ',     label: 'During Quarter', special: 'duringQuarter' },
-  { id: 'fwdPE',       label: 'Forward P/E',    special: 'forwardPE' },
-  { id: 'vixSpikes',   label: 'VIX Spikes',     special: 'vixSpikes' },
-  { id: 'miscStats',   label: 'Misc Stats',     special: 'miscStats' },
-];
-
-const COL_LABELS = {
-  symbol: 'Symbol', name: 'Name', close: 'Close', ema: 'EMA', pct: '% EMA',
-  weeksBelow: 'Weeks Below', weeksAbove: 'Weeks Above',
-  monthsBelow: 'Months Below', monthsAbove: 'Months Above',
-  quartersBelow: 'Quarters Below', quartersAbove: 'Quarters Above',
-  count: 'Count',
-  ytdPct: 'YTD', highPct: 'vs High', high3yr: '3yr High', lowPct: 'vs Low', low52wk: '52wk Low',
-  return1Y: '1 Year', return5Y: '5 Year',
-  rsi: 'RSI', forwardPE: 'Fwd P/E', pctSma200d: '% 200D', pctSma200w: '% 200W',
-  breakoutPct: 'Breakout %', breakdownPct: 'Breakdown %',
-  breakoutPrice: 'Breakout', breakdownPrice: 'Breakdown',
-  breakoutDate: 'Date', breakdownDate: 'Date',
-  spikeClose: 'Spike Close', pctGain: '% Gain',
-  wkStatus: 'Wk EMA', moStatus: 'Mo EMA', qtrStatus: 'Qtr EMA',
+const COUNT_KEYS = {
+  weekly: { up: 'weeksBelow', down: 'weeksAbove' },
+  monthly: { up: 'monthsBelow', down: 'monthsAbove' },
+  quarterly: { up: 'quartersBelow', down: 'quartersAbove' },
 };
-
-const CROSS_UP_TABS = new Set(['crossovers', 'moCrossUp', 'qCrossUp']);
-const CROSS_DOWN_TABS = new Set(['crossdowns', 'moCrossDown', 'qCrossDown']);
-
-const TAB_GROUPS = [
-  { label: 'Dashboards', tabs: ['etfDashboard', 'megaDashboard'] },
-  { label: 'Weekly',    tabs: ['crossovers', 'crossdowns', 'weekBelow', 'weekAbove'] },
-  { label: 'Monthly',   tabs: ['moCrossUp', 'moCrossDown', 'moBelow', 'moAbove'] },
-  { label: 'Quarterly', tabs: ['qCrossUp', 'qCrossDown', 'qBelow', 'qAbove'] },
-  { label: 'Performance', tabs: ['performance', 'priceBreaks', 'sinceQ', 'duringQ', 'fwdPE', 'vixSpikes'] },
-];
-
-const GROUPED_TAB_IDS = new Set(TAB_GROUPS.flatMap(g => g.tabs));
-const STANDALONE_TABS = TAB_DEFS.filter(t => !GROUPED_TAB_IDS.has(t.id));
-
-const NUM_COLS = new Set(['close','ema','pct','weeksBelow','weeksAbove','monthsBelow','monthsAbove','quartersBelow','quartersAbove','count','ytdPct','highPct','high3yr','lowPct','low52wk','rsi','forwardPE','pctSma200d','pctSma200w','breakoutPct','breakdownPct','breakoutPrice','breakdownPrice','spikeClose','pctGain','return1Y','return5Y']);
 
 const state = {
-  activeSourceMode: 'all',
-  data: {},
-  statsMap: {},
-  activeTab: 'etfDashboard',
-  sortCol: null,
-  sortAsc: true,
-  filters: {},
-  lowSignalActive: true,
-  activeQuickFilters: new Set(),
-  activeColorFilters: new Set(),
+  view: 'pulse',
+  raw: {},
+  stats: {},
+  misc: {},
   manifest: [],
   selectedWeek: 'latest',
-  dynPctCols: new Set(),
-  dynPECols: new Set(),
-  dynPEPrevCol: {},
-  tabCountCache: {},
-  showAllRows: false,
   isScanning: false,
-  latestJson: null,
+  scanTime: null,
+  errorsCount: 0,
+  symbolsScanned: 0,
+  totalSymbols: 0,
+
+  crossTimeframe: 'weekly',  // weekly | monthly | quarterly
+  crossDirection: 'up',       // up | down | above | below
+  crossFilter: 'all',         // all | watch | sectors | mega | small
+  crossSearch: '',
+
+  watchlist: loadWatchlist(),
+  watchlistEditing: false,
+
+  moreOpen: {},
 };
 
-function debounce(fn, delay) {
-  let timer;
-  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+/* ── Persistence ── */
+
+function loadWatchlist() {
+  try {
+    const v = JSON.parse(localStorage.getItem('ss_watchlist'));
+    if (Array.isArray(v)) return v.filter(x => typeof x === 'string').slice(0, 30);
+  } catch {}
+  return [...DEFAULT_WATCHLIST];
+}
+function saveWatchlist() {
+  try { localStorage.setItem('ss_watchlist', JSON.stringify(state.watchlist)); } catch {}
 }
 
-function resetTabState() {
-  state.tabCountCache = {};
-  state.showAllRows = false;
+/* ── Helpers ── */
+
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+
+const fmtPct = (v, opts = {}) => {
+  if (v == null || Number.isNaN(v)) return '—';
+  const sign = v > 0 ? '+' : '';
+  const decimals = opts.decimals != null ? opts.decimals : (Math.abs(v) >= 100 ? 1 : 2);
+  return `${sign}${v.toFixed(decimals)}%`;
+};
+
+const fmtPrice = (v) => {
+  if (v == null || Number.isNaN(v)) return '—';
+  if (v >= 1000) return v.toFixed(0);
+  if (v >= 100) return v.toFixed(1);
+  if (v >= 10) return v.toFixed(2);
+  return v.toFixed(2);
+};
+
+const fmtTime = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+};
+
+const fmtWeekLabel = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+parts[1]-1]} ${+parts[2]}`;
+};
+
+const upDownCls = (v) => v == null ? '' : v >= 0 ? 'up' : 'down';
+
+const tvLink = (sym, interval = 'W') =>
+  `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}&interval=${interval}`;
+
+const isMobile = () => window.innerWidth <= 700;
+
+const debounce = (fn, ms) => {
+  let t;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+};
+
+/* ── EMA status helpers ── */
+
+function statusDot(s) {
+  if (!s || s.above == null) return '<span class="dot" title="—"></span>';
+  const onTop = Math.abs(s.pctDiff || 0) <= 1.5;
+  if (onTop) return '<span class="dot flat" title="On-top"></span>';
+  return s.above
+    ? '<span class="dot up" title="Above"></span>'
+    : '<span class="dot down" title="Below"></span>';
 }
 
-function switchToTab(tabId) {
-  state.activeTab = tabId;
-  state.sortCol = null;
-  state.sortAsc = true;
-  resetTabState();
-  closeAllDropdowns();
-  writeHash();
-  renderTabs();
-  showTab(state.activeTab);
+function tripleDots(emaStatus) {
+  if (!emaStatus) return '<span class="watch-dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span>';
+  return `<span class="watch-dots" title="Wk · Mo · Qtr">
+    ${statusDot(emaStatus.weekly)}
+    ${statusDot(emaStatus.monthly)}
+    ${statusDot(emaStatus.quarterly)}
+  </span>`;
 }
 
-function sortQuarterKeys(keys) {
-  // Newest first (e.g. Q4'25, Q3'25, Q2'25, Q1'25, Q4'24...)
-  return [...keys].sort((a, b) => {
-    const [quarterA, yearA] = [a[1], a.slice(3)];
-    const [quarterB, yearB] = [b[1], b.slice(3)];
-    if (yearA !== yearB) return Number(yearB) - Number(yearA);
-    return Number(quarterB) - Number(quarterA);
+/* ── Initial render scaffolding ── */
+
+function setView(v) {
+  if (!VIEWS.includes(v)) v = 'pulse';
+  state.view = v;
+  location.hash = v;
+  renderNav();
+  renderView();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderNav() {
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === state.view);
   });
 }
 
-/* ── Hash persistence ── */
-
-function readHash() {
-  const h = location.hash.replace('#', '');
-  if (h && TAB_DEFS.some(t => t.id === h)) state.activeTab = h;
+function renderView() {
+  const main = document.getElementById('main');
+  if (state.view === 'pulse') main.innerHTML = renderPulse();
+  else if (state.view === 'crosses') main.innerHTML = renderCrosses();
+  else main.innerHTML = renderMore();
+  attachViewHandlers();
 }
 
-function writeHash() {
-  history.replaceState(null, '', '#' + state.activeTab);
+function attachViewHandlers() {
+  if (state.view === 'pulse') wirePulse();
+  if (state.view === 'crosses') wireCrosses();
+  if (state.view === 'more') wireMore();
 }
 
-/* ── Source toggles ── */
+/* ─────────────────────────────────────────────
+   PULSE VIEW
+   ───────────────────────────────────────────── */
 
-function isSourceActive(id) {
-  if (state.activeSourceMode === 'all') return id === 'all';
-  if (state.activeSourceMode === 'none') return id === 'none';
-  return state.activeSourceMode.has(id);
+function renderPulse() {
+  return [
+    renderBreadthSection(),
+    renderSectorsSection(),
+    renderWatchlistSection(),
+    renderMilesSection(),
+    renderLookbackSection(),
+  ].join('');
 }
 
-function renderSourceToggles() {
-  const el = document.getElementById('source-toggles');
-  const capIds = ['all', 'none', 'small', 'mega'];
-  const etfIds = SOURCE_ORDER.filter(id => !capIds.includes(id));
-  const btnHTML = ids => ids.map(id => {
-    const cls = isSourceActive(id) ? ' active' : '';
-    return `<button class="source-btn${cls}" data-src="${id}">${SOURCE_DEFS[id].label}</button>`;
-  }).join('');
-  el.innerHTML =
-    `<div class="source-group">${btnHTML(capIds)}</div>` +
-    `<div class="source-group">${btnHTML(etfIds)}</div>`;
-  el.querySelectorAll('.source-btn').forEach(btn =>
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.src;
-      if (id === 'all') {
-        state.activeSourceMode = 'all';
-      } else if (id === 'none') {
-        state.activeSourceMode = 'none';
-      } else if (CAP_FILTERS.includes(id)) {
-        state.activeSourceMode = new Set([id]);
-      } else {
-        let cur = (state.activeSourceMode instanceof Set) ? new Set(state.activeSourceMode) : new Set();
-        CAP_FILTERS.forEach(c => cur.delete(c));
-        if (cur.has(id)) cur.delete(id);
-        else cur.add(id);
-        state.activeSourceMode = cur.size > 0 ? cur : 'all';
-      }
-      resetTabState();
-      renderSourceToggles();
-      renderTabs();
-      showTab(state.activeTab);
-    })
-  );
-  updateSourceDrawerLabel();
+function renderBreadthSection() {
+  const m = state.misc || {};
+  const bench = m.benchmarkByTicker || {};
+  const spy = bench.SPY || {};
+  const qqq = bench.QQQ || {};
+
+  const tile = (label, value, valCls, sub) => `
+    <div class="tile">
+      <div class="tile-label">${esc(label)}</div>
+      <div class="tile-value ${valCls}">${value}</div>
+      ${sub ? `<div class="tile-sub">${sub}</div>` : ''}
+    </div>`;
+
+  const cell = (val) => `<span class="${upDownCls(val)}">${fmtPct(val)}</span>`;
+
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2 class="section-title"><em>Market</em> Pulse</h2>
+        <span class="section-aside">Breadth</span>
+      </div>
+      <div class="breadth">
+        ${tile('SPY · YTD', fmtPct(spy.ytd), upDownCls(spy.ytd), `1Y ${cell(spy.oneY)} · 5Y ${cell(spy.fiveY)}`)}
+        ${tile('QQQ · YTD', fmtPct(qqq.ytd), upDownCls(qqq.ytd), `1Y ${cell(qqq.oneY)} · 5Y ${cell(qqq.fiveY)}`)}
+        ${tile('Above 5W EMA', m.pctAbove5wkEMA != null ? `${m.pctAbove5wkEMA.toFixed(0)}%` : '—', m.pctAbove5wkEMA >= 50 ? 'up' : 'down', `Below ${m.pctBelow5wkEMA != null ? m.pctBelow5wkEMA.toFixed(0) + '%' : '—'}`)}
+        ${tile('Above 200D SMA', m.pctAbove200dSMA != null ? `${m.pctAbove200dSMA.toFixed(0)}%` : '—', m.pctAbove200dSMA >= 50 ? 'up' : 'down', `Above 200W ${m.pctAbove200wSMA != null ? m.pctAbove200wSMA.toFixed(0) + '%' : '—'}`)}
+      </div>
+    </div>
+  `;
 }
 
-function matchesSources(symbol, row) {
-  if (state.activeSourceMode === 'all') return true;
-  if (state.activeSourceMode === 'none') return false;
-  return [...state.activeSourceMode].some(id => {
-    const def = SOURCE_DEFS[id];
-    if (def.match) return def.match(symbol, row);
-    if (def.set) return def.set.has(symbol);
-    return false;
-  });
+function renderSectorsSection() {
+  const bench = state.misc?.benchmarkByTicker || {};
+  const chips = SECTOR_ORDER.map(sym => {
+    const b = bench[sym];
+    if (!b) return '';
+    const st = state.stats[sym]?.emaStatus || {};
+    return `
+      <button class="chip" data-sym="${sym}">
+        <div class="chip-head">
+          <span class="chip-sym">${sym}</span>
+          ${tripleDots(st).replace('watch-dots', 'chip-dots')}
+        </div>
+        <div class="chip-name">${esc(SECTOR_NAMES[sym] || sym)}</div>
+        <div class="chip-row">
+          <span class="chip-ytd ${upDownCls(b.ytd)}">${fmtPct(b.ytd)}</span>
+          <span class="chip-1y">1Y ${fmtPct(b.oneY)}</span>
+        </div>
+      </button>`;
+  }).filter(Boolean).join('');
+
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2 class="section-title"><em>Sectors</em></h2>
+        <span class="section-aside">YTD · 1Y · 5EMA</span>
+      </div>
+      <div class="ribbon-wrap"><div class="ribbon">${chips}</div></div>
+    </div>
+  `;
 }
 
-/* ── Default filters ── */
+function renderWatchlistSection() {
+  const rows = state.watchlist.map(sym => {
+    const s = state.stats[sym];
+    const bench = state.misc?.benchmarkByTicker?.[sym];
+    const ytd = bench?.ytd ?? s?.ytdPct;
+    const oneY = bench?.oneY ?? s?.return1Y;
+    const close = s?.close;
+    const name = s?.name || SECTOR_NAMES[sym] || '';
+    const emaStatus = s?.emaStatus;
 
-function applyLowSignalFilters() {
-  Object.entries(DEFAULT_FILTERS).forEach(([c, def]) => {
-    state.filters[c] = { ...def };
-  });
-}
-
-function initDefaultFilters() {
-  state.filters = {};
-  state.activeQuickFilters.clear();
-  state.lowSignalActive = true;
-  applyLowSignalFilters();
-}
-
-function clearAllFilters() {
-  state.filters = {};
-  state.activeQuickFilters.clear();
-  state.activeColorFilters.clear();
-  state.lowSignalActive = false;
-}
-
-/* ── Quick filters ── */
-
-const QUICK_FILTERS = [
-  { id: 'low',  label: 'Low $',  col: 'close', values: { min: 3, max: 20 } },
-  { id: 'mid',  label: 'Mid $',  col: 'close', values: { min: 20, max: 300 } },
-  { id: 'high', label: 'High $', col: 'close', values: { min: 300, max: '' } },
-];
-
-const COLOR_FILTERS = [];
-
-const COLOR_FILTERS_MAP = new Map(COLOR_FILTERS.map(cf => [cf.id, cf]));
-
-/* ── Toolbar ── */
-
-function renderToolbar(filteredCount, totalCount) {
-  const el = document.getElementById('toolbar');
-  const quickBtns = QUICK_FILTERS.map(qf => {
-    const cls = state.activeQuickFilters.has(qf.id) ? ' active' : '';
-    return `<button class="quick-btn${cls}" data-qf="${qf.id}">${qf.label}</button>`;
-  }).join('');
-
-  const colorBtns = COLOR_FILTERS.map(cf => {
-    const cls = state.activeColorFilters.has(cf.id) ? ' active' : '';
-    return `<button class="quick-btn${cls}" data-cf="${cf.id}">${cf.label}</button>`;
-  }).join('');
-
-  const lsCls = state.lowSignalActive ? ' active' : '';
-  el.innerHTML =
-    `<span class="row-count">Showing <strong>${filteredCount}</strong> of <strong>${totalCount}</strong></span>` +
-    `<button class="quick-btn${lsCls}" id="low-signal-btn">Filter Low Signal</button>` +
-    quickBtns +
-    `<button class="reset-btn" id="clear-filters-btn">Remove Filters</button>`;
-
-  document.getElementById('low-signal-btn').addEventListener('click', () => {
-    state.lowSignalActive = !state.lowSignalActive;
-    if (state.lowSignalActive) {
-      applyLowSignalFilters();
-    } else {
-      Object.keys(DEFAULT_FILTERS).forEach(c => {
-        delete state.filters[c];
-      });
+    if (!s) {
+      return `
+        <div class="watch-row" data-sym="${sym}">
+          <div class="watch-sym">
+            <span class="watch-sym-tic">${esc(sym)}</span>
+            <span class="watch-sym-name muted">No data</span>
+          </div>
+          <span class="watch-price muted">—</span>
+          <span class="watch-pct muted">—</span>
+          ${tripleDots(null)}
+          <button class="remove-btn" data-remove="${esc(sym)}" aria-label="Remove">×</button>
+        </div>`;
     }
-    state.activeQuickFilters.clear();
-    resetTabState();
-    renderTabs();
-    showTab(state.activeTab);
-  });
-  document.getElementById('clear-filters-btn').addEventListener('click', () => {
-    clearAllFilters();
-    resetTabState();
-    renderTabs();
-    showTab(state.activeTab);
-  });
-  el.querySelectorAll('.quick-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const qfId = btn.dataset.qf;
-      const cfId = btn.dataset.cf;
-      if (qfId) {
-        const qf = QUICK_FILTERS.find(q => q.id === qfId);
-        if (state.activeQuickFilters.has(qfId)) {
-          state.activeQuickFilters.delete(qfId);
-          if (DEFAULT_FILTERS[qf.col]) {
-            state.filters[qf.col] = { ...DEFAULT_FILTERS[qf.col] };
-          } else {
-            delete state.filters[qf.col];
-          }
-        } else {
-          QUICK_FILTERS.filter(q => q.col === qf.col && q.id !== qfId)
-            .forEach(q => state.activeQuickFilters.delete(q.id));
-          state.activeQuickFilters.add(qfId);
-          state.filters[qf.col] = { ...qf.values };
-        }
-      } else if (cfId) {
-        if (state.activeColorFilters.has(cfId)) {
-          state.activeColorFilters.delete(cfId);
-        } else {
-          state.activeColorFilters.add(cfId);
-        }
-      }
-      resetTabState();
-      renderTabs();
-      showTab(state.activeTab);
+
+    return `
+      <div class="watch-row" data-sym="${sym}">
+        <div class="watch-sym">
+          <span class="watch-sym-tic">${esc(sym)}</span>
+          <span class="watch-sym-name">${esc(name)}</span>
+        </div>
+        <span class="watch-price">${fmtPrice(close)}</span>
+        <span class="watch-pct ${upDownCls(ytd)}">${fmtPct(ytd)}<div class="watch-pct-sub">1Y ${fmtPct(oneY)}</div></span>
+        ${tripleDots(emaStatus)}
+        <button class="remove-btn" data-remove="${esc(sym)}" aria-label="Remove">×</button>
+      </div>`;
+  }).join('');
+
+  const editCls = state.watchlistEditing ? ' editing' : '';
+  const editLabel = state.watchlistEditing ? 'Done' : 'Edit';
+
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2 class="section-title"><em>Watchlist</em></h2>
+        <button class="btn-ghost ${state.watchlistEditing ? 'toggled' : ''}" id="watch-edit-btn">${editLabel}</button>
+      </div>
+      <div class="watch${editCls}" id="watch-list">
+        ${rows || '<div class="watch-empty">No tickers pinned. Tap any symbol to add it.</div>'}
+      </div>
+      ${state.watchlistEditing ? `
+        <div class="add-row">
+          <input class="add-input" id="watch-add-input" placeholder="Ticker (e.g. NVDA)" maxlength="8" autocomplete="off" spellcheck="false" />
+          <button class="add-btn" id="watch-add-btn">Add</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderMilesSection() {
+  const m = state.misc || {};
+  const milestones = [
+    { key: 'spxSinceElection',     label: 'SPX · Since Election' },
+    { key: 'spxSinceInauguration', label: 'SPX · Since Inaug.' },
+    { key: 'spxSinceChatGPT',      label: 'SPX · Since ChatGPT' },
+    { key: 'spxSinceBottom2022',   label: 'SPX · Since 2022 Low' },
+  ];
+
+  const cells = milestones.map(({ key, label }) => {
+    const v = m[key];
+    return `
+      <div class="mile">
+        <div class="mile-label">${esc(label)}</div>
+        <div class="mile-value ${upDownCls(v)}">${fmtPct(v, { decimals: 1 })}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2 class="section-title">SPX <em>milestones</em></h2>
+      </div>
+      <div class="miles">${cells}</div>
+    </div>
+  `;
+}
+
+function renderLookbackSection() {
+  if (!state.manifest || state.manifest.length === 0) return '';
+  const latestCls = state.selectedWeek === 'latest' ? ' active' : '';
+  const buttons = [`<button class="lookback-btn${latestCls}" data-week="latest">Latest</button>`]
+    .concat(state.manifest.map(w => {
+      const cls = state.selectedWeek === w ? ' active' : '';
+      return `<button class="lookback-btn${cls}" data-week="${esc(w)}">${fmtWeekLabel(w)}</button>`;
+    })).join('');
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2 class="section-title"><em>Lookback</em></h2>
+        <span class="section-aside">Saved Mondays</span>
+      </div>
+      <div class="lookback">${buttons}</div>
+    </div>
+  `;
+}
+
+function wirePulse() {
+  // Sector chip → open detail
+  document.querySelectorAll('.chip[data-sym]').forEach(el =>
+    el.addEventListener('click', () => openSymbolSheet(el.dataset.sym))
+  );
+
+  // Watchlist row → open detail (unless tapping remove button)
+  document.querySelectorAll('.watch-row[data-sym]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.remove-btn')) return;
+      openSymbolSheet(el.dataset.sym);
     });
   });
-}
 
-/* ── Sorting ── */
-
-function sortRows(rows) {
-  if (!state.sortCol) return;
-  const col = state.sortCol;
-  const asc = state.sortAsc;
-  rows.sort((rowA, rowB) => {
-    const valA = rowA[col], valB = rowB[col];
-    if (typeof valA === 'number' && typeof valB === 'number') return asc ? valA - valB : valB - valA;
-    return asc ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
-  });
-}
-
-/* ── Filtering ── */
-
-function applyFilters(rows, cols) {
-  return rows.filter(row => {
-    if (!matchesSources(row.symbol, row)) return false;
-    for (const col of cols) {
-      const filter = state.filters[col];
-      if (!filter) continue;
-      if (col === 'symbol') {
-        if (filter.text && !String(row[col]).toLowerCase().includes(filter.text.toLowerCase())) return false;
-      } else if (col === 'wkStatus' || col === 'moStatus' || col === 'qtrStatus') {
-        const timeframeMap = { wkStatus: 'weekly', moStatus: 'monthly', qtrStatus: 'quarterly' };
-        const status = row.emaStatus?.[timeframeMap[col]];
-        if (!status || status.above == null) continue;
-        
-        const isOnTop = Math.abs(status.pctDiff || 0) <= 1.5;
-        if (isOnTop) {
-          if (!filter.ontop) return false;
-        } else if (status.above) {
-          if (!filter.above) return false;
-        } else {
-          if (!filter.below) return false;
-        }
-      } else {
-        const val = row[col];
-        if (val == null) return false;
-        if (filter.min !== '' && filter.min != null && val < Number(filter.min)) return false;
-        if (filter.max !== '' && filter.max != null && val > Number(filter.max)) return false;
-      }
-    }
-    for (const cfId of state.activeColorFilters) {
-      const colorFilter = COLOR_FILTERS_MAP.get(cfId);
-      if (colorFilter && !colorFilter.test(row)) return false;
-    }
-    return true;
-  });
-}
-
-/* ── Row rendering ── */
-
-function renderRowHTML(row, cols, pctField, tabId) {
-  return '<tr>' + cols.map(col => {
-    const val = row[col];
-    const emaCls = col === 'ema' ? ' col-ema' : '';
-    if (col === 'symbol') {
-      const interval = tabId.startsWith('mo') ? 'M' : 'W';
-      const url = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(val)}&interval=${interval}`;
-      return `<td class="symbol"><a href="${url}" target="_blank">${esc(val)}</a></td>`;
-    }
-    if (col === 'pct') {
-      const cls = val > 0 ? 'pct-positive' : val < 0 ? 'pct-negative' : '';
-      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
-    }
-    if (col === 'close') {
-      const cls = row.close > row.ema ? 'close-above' : row.close < row.ema ? 'close-below' : '';
-      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
-    }
-    if (col === 'ytdPct' || col === 'highPct' || col === 'lowPct') {
-      const isGreen = col === 'ytdPct' ? val >= 0 : col === 'highPct' ? val >= -5 : val > 5;
-      const cls = val != null ? (isGreen ? 'pct-positive' : 'pct-negative') : '';
-      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
-    }
-    if (col === 'rsi' && val != null) {
-      const cls = val > 70 ? 'pct-negative' : val < 30 ? 'pct-positive' : '';
-      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
-    }
-    if (col === 'pctSma200d' || col === 'pctSma200w') {
-      const cls = val != null ? (val >= 0 ? 'pct-positive' : 'pct-negative') : '';
-      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
-    }
-    if (col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain') {
-      const cls = val != null ? (val >= 0 ? 'pct-positive' : 'pct-negative') : '';
-      return `<td class="num ${cls}">${fmtNum(col, val)}</td>`;
-    }
-    if (tabId === 'fwdPE' && state.dynPECols.has(col)) {
-      if (val == null) return `<td class="num">\u2014</td>`;
-      const prevCol = state.dynPEPrevCol[col];
-      const prevVal = prevCol ? row[prevCol] : null;
-      let cls = '';
-      if (prevVal != null) cls = val < prevVal ? 'pct-positive' : val > prevVal ? 'pct-negative' : '';
-      return `<td class="num ${cls}">${val.toFixed(1)}</td>`;
-    }
-    if (state.dynPctCols.has(col) || (state.dynPECols.has(col) && tabId !== 'fwdPE')) {
-      if (val == null) return `<td class="num">\u2014</td>`;
-      const cls = val >= 0 ? 'pct-positive' : 'pct-negative';
-      return `<td class="num ${cls}">${(val > 0 ? '+' : '') + val.toFixed(2)}%</td>`;
-    }
-    if (NUM_COLS.has(col)) return `<td class="num${emaCls}">${fmtNum(col, val)}</td>`;
-    if (col === 'name') return `<td class="name">${esc(val)}</td>`;
-    if (col === 'wkStatus' || col === 'moStatus' || col === 'qtrStatus') return `<td>${val}</td>`;
-    return `<td>${esc(val)}</td>`;
-  }).join('') + '</tr>';
-}
-
-const ROW_RENDER_LIMIT = 500;
-
-function renderTbodyHTML(rows, cols, pctField, tabId) {
-  if (rows.length === 0) {
-    return `<tr><td colspan="${cols.length}" style="text-align:center;padding:32px;color:var(--text-muted);font-family:var(--font-ui)">No data</td></tr>`;
-  }
-  const limit = state.showAllRows ? rows.length : Math.min(rows.length, ROW_RENDER_LIMIT);
-  let html = rows.slice(0, limit).map(row => renderRowHTML(row, cols, pctField, tabId)).join('');
-  if (limit < rows.length) {
-    html += `<tr class="show-all-row"><td colspan="${cols.length}" style="text-align:center;padding:16px;color:var(--accent);cursor:pointer;font-family:var(--font-ui);font-size:13px">Show all ${rows.length.toLocaleString()} rows (${(rows.length - limit).toLocaleString()} more)</td></tr>`;
-  }
-  return html;
-}
-
-/* ── Tabs ── */
-
-function getTabCount(t) {
-  if (t.id === 'miscStats') return '';
-  if (t.special) {
-    const rows = state.data[t.id] || [];
-    return `${rows.filter(r => matchesSources(r.symbol, r)).length}`;
-  }
-  const total = state.data[t.id] ? state.data[t.id].filter(r => matchesSources(r.symbol, r)).length : 0;
-  const filtered = state.data[t.id] ? applyFilters(state.data[t.id], t.cols).length : 0;
-  const isActive = t.id === state.activeTab;
-  const hasFilter = isActive && Object.keys(state.filters).length > 0 &&
-    Object.values(state.filters).some(f => f.text || (f.min !== '' && f.min != null) || (f.max !== '' && f.max != null) || f.above !== undefined);
-  return hasFilter ? `${filtered} / ${total}` : `${total}`;
-}
-
-function getTabCountCached(t) {
-  if (t.id === state.activeTab) {
-    const count = getTabCount(t);
-    state.tabCountCache[t.id] = count;
-    return count;
-  }
-  if (state.tabCountCache[t.id] != null) return state.tabCountCache[t.id];
-  const count = getTabCount(t);
-  state.tabCountCache[t.id] = count;
-  return count;
-}
-
-const isMobile = () => window.innerWidth <= 640;
-
-function renderTabs() {
-  const el = document.getElementById('tabs');
-  let html = '';
-
-  // Grouped tabs (dropdowns)
-  for (const group of TAB_GROUPS) {
-    const groupTabDefs = group.tabs.map(id => TAB_DEFS.find(t => t.id === id)).filter(Boolean);
-    const activeInGroup = groupTabDefs.find(t => t.id === state.activeTab);
-    const activeLabel = activeInGroup ? activeInGroup.label : group.label;
-
-    let btnCls = 'tab-group-btn';
-    if (activeInGroup) {
-      if (CROSS_UP_TABS.has(activeInGroup.id)) btnCls += ' has-cross-up';
-      else if (CROSS_DOWN_TABS.has(activeInGroup.id)) btnCls += ' has-cross-down';
-      else btnCls += ' active';
-    }
-
-    const countText = activeInGroup ? getTabCountCached(activeInGroup) : '';
-    const countSpan = countText ? `<span class="count">${countText}</span>` : '';
-
-    html += `<div class="tab-group" data-group-label="${esc(group.label)}">`;
-    html += `<button class="${btnCls}">${activeLabel}${countSpan}</button>`;
-    html += `<div class="tab-dropdown">`;
-    for (const t of groupTabDefs) {
-      const isActive = t.id === state.activeTab;
-      const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
-      const tabCount = getTabCountCached(t);
-      const tabCountSpan = tabCount ? `<span class="count">${tabCount}</span>` : '';
-      html += `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${tabCountSpan}</div>`;
-    }
-    html += `</div></div>`;
-  }
-
-  // Standalone tabs
-  for (const t of STANDALONE_TABS) {
-    const isActive = t.id === state.activeTab;
-    const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
-    const countText = getTabCountCached(t);
-    const countSpan = countText ? `<span class="count">${countText}</span>` : '';
-    html += `<div class="tab standalone${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${countSpan}</div>`;
-  }
-
-  el.innerHTML = html;
-
-  // Dropdown toggle — bottom sheet on mobile, position:fixed on desktop
-  el.querySelectorAll('.tab-group-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // Remove from watchlist
+  document.querySelectorAll('.remove-btn').forEach(b =>
+    b.addEventListener('click', (e) => {
       e.stopPropagation();
-      const group = btn.parentElement;
-
-      if (isMobile()) {
-        openTabSheet(group);
-        return;
-      }
-
-      const wasOpen = group.classList.contains('open');
-      closeAllDropdowns();
-      if (!wasOpen) {
-        const rect = btn.getBoundingClientRect();
-        const dropdown = group.querySelector('.tab-dropdown');
-        group.classList.add('open');
-        const ddRect = dropdown.getBoundingClientRect();
-        let top = rect.bottom;
-        let left = rect.left;
-        if (left + ddRect.width > window.innerWidth - 8) left = window.innerWidth - ddRect.width - 8;
-        if (left < 8) left = 8;
-        if (top + ddRect.height > window.innerHeight - 8) top = rect.top - ddRect.height;
-        if (top < 8) top = 8;
-        dropdown.style.top = top + 'px';
-        dropdown.style.left = left + 'px';
-      }
-    });
-  });
-
-  // Tab clicks (both dropdown and standalone)
-  el.querySelectorAll('.tab[data-tab]').forEach(tab => {
-    tab.addEventListener('click', () => switchToTab(tab.dataset.tab));
-  });
-}
-
-function closeAllDropdowns() {
-  document.querySelectorAll('.tab-group.open').forEach(g => g.classList.remove('open'));
-}
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.tab-group')) closeAllDropdowns();
-});
-
-/* ── Mobile Bottom Sheet for tab groups ── */
-
-function openTabSheet(groupEl) {
-  const overlay = document.getElementById('tab-sheet-overlay');
-  const title = document.getElementById('tab-sheet-title');
-  const items = document.getElementById('tab-sheet-items');
-  const label = groupEl.dataset.groupLabel || '';
-
-  title.textContent = label;
-
-  const groupTabDefs = [];
-  const groupDef = TAB_GROUPS.find(g => g.label === label);
-  if (!groupDef) return;
-
-  let html = '';
-  for (const id of groupDef.tabs) {
-    const t = TAB_DEFS.find(td => td.id === id);
-    if (!t) continue;
-    const isActive = t.id === state.activeTab;
-    const crossCls = CROSS_UP_TABS.has(t.id) ? ' cross-up' : CROSS_DOWN_TABS.has(t.id) ? ' cross-down' : '';
-    const tabCount = getTabCountCached(t);
-    const tabCountSpan = tabCount ? `<span class="count">${tabCount}</span>` : '';
-    html += `<div class="tab${isActive ? ' active' : ''}${crossCls}" data-tab="${t.id}">${t.label}${tabCountSpan}</div>`;
-  }
-
-  items.innerHTML = html;
-  overlay.classList.add('open');
-
-  items.querySelectorAll('.tab[data-tab]').forEach(tab => {
-    tab.addEventListener('click', () => {
-      closeTabSheet();
-      switchToTab(tab.dataset.tab);
-    });
-  });
-}
-
-function closeTabSheet() {
-  document.getElementById('tab-sheet-overlay').classList.remove('open');
-}
-
-document.getElementById('tab-sheet-overlay').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeTabSheet();
-});
-
-/* ── Mobile Source Drawer ── */
-
-function updateSourceDrawerLabel() {
-  const label = document.getElementById('source-drawer-label');
-  if (!label) return;
-  if (state.activeSourceMode === 'all') label.textContent = 'All';
-  else if (state.activeSourceMode === 'none') label.textContent = 'None';
-  else if (state.activeSourceMode instanceof Set) {
-    label.textContent = [...state.activeSourceMode].map(id => SOURCE_DEFS[id]?.label || id).join(', ');
-  }
-}
-
-document.getElementById('source-drawer-toggle').addEventListener('click', () => {
-  const btn = document.getElementById('source-drawer-toggle');
-  const el = document.getElementById('source-toggles');
-  const isOpen = el.classList.contains('drawer-open');
-  el.classList.toggle('drawer-open', !isOpen);
-  btn.classList.toggle('open', !isOpen);
-});
-
-/* ── Table building helpers ── */
-
-function renderTableHeader(def) {
-  return def.cols.map(c => {
-    const isSorted = state.sortCol === c;
-    const arrow = isSorted ? (state.sortAsc ? '\u25B2' : '\u25BC') : '\u25B4';
-    const cls = [c === 'symbol' ? 'col-symbol' : '', c === 'name' ? 'col-name' : '', NUM_COLS.has(c) ? 'num' : '', isSorted ? 'sorted' : '', c === 'ema' ? 'col-ema' : ''].filter(Boolean).join(' ');
-    return `<th class="${cls}" data-col="${c}">${COL_LABELS[c]}<span class="sort-arrow">${arrow}</span></th>`;
-  }).join('');
-}
-
-function renderFilterRow(def) {
-  return def.cols.map(c => {
-    const emaClass = c === 'ema' ? ' col-ema' : '';
-    if (c === 'name') return `<td class="col-name"></td>`;
-    if (c === 'symbol') {
-      const val = state.filters[c]?.text || '';
-      return `<td class="col-symbol-filter"><input type="text" class="filter-symbol" data-col="${c}" placeholder="Filter\u2026" value="${esc(val)}"></td>`;
-    }
-    if (c === 'wkStatus' || c === 'moStatus' || c === 'qtrStatus') {
-      const f = state.filters[c] || { above: true, below: true, ontop: true };
-      return `<td><div class="ema-checkbox-filters">` +
-        `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="above" ${f.above ? 'checked' : ''}> Above</label>` +
-        `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="below" ${f.below ? 'checked' : ''}> Below</label>` +
-        `<label class="ema-checkbox-group"><input type="checkbox" data-col="${c}" data-bound="ontop" ${f.ontop ? 'checked' : ''}> On-Top</label>` +
-        `</div></td>`;
-    }
-    const f = state.filters[c] || {};
-    const minVal = f.min != null ? f.min : '';
-    const stackClass = c === 'close' ? ' num-filters-stacked' : '';
-    const defaultBound = c === 'rsi' ? 'max' : 'min';
-    const defaultVal = defaultBound === 'max' ? (f.max != null ? f.max : '') : minVal;
-    let cell = `<td class="num${emaClass}"><div class="num-filters${stackClass}">` +
-      `<div class="num-filter-group">` +
-        `<button class="spin-btn" data-col="${c}" data-bound="${defaultBound}" data-dir="-1">&#x2212;</button>` +
-        `<input type="number" class="filter-num" data-col="${c}" data-bound="${defaultBound}" placeholder="${defaultBound}" value="${defaultVal}">` +
-        `<button class="spin-btn" data-col="${c}" data-bound="${defaultBound}" data-dir="1">+</button>` +
-      `</div>`;
-    if (c === 'close') {
-      const maxVal = f.max != null ? f.max : '';
-      cell +=
-        `<div class="num-filter-group">` +
-          `<button class="spin-btn" data-col="${c}" data-bound="max" data-dir="-1">&#x2212;</button>` +
-          `<input type="number" class="filter-num" data-col="${c}" data-bound="max" placeholder="max" value="${maxVal}">` +
-          `<button class="spin-btn" data-col="${c}" data-bound="max" data-dir="1">+</button>` +
-        `</div>`;
-    }
-    return cell + `</div></td>`;
-  }).join('');
-}
-
-function attachFilterListeners(def, tabId) {
-  document.querySelectorAll('th[data-col]').forEach(th =>
-    th.addEventListener('click', () => {
-      const col = th.dataset.col;
-      if (state.sortCol === col) state.sortAsc = !state.sortAsc;
-      else { state.sortCol = col; state.sortAsc = NUM_COLS.has(col) ? false : true; }
-      state.showAllRows = false;
-      document.querySelectorAll('th[data-col]').forEach(h => {
-        const isSorted = state.sortCol === h.dataset.col;
-        h.classList.toggle('sorted', isSorted);
-        const arrow = h.querySelector('.sort-arrow');
-        if (arrow) arrow.textContent = isSorted ? (state.sortAsc ? '\u25B2' : '\u25BC') : '\u25B4';
-      });
-      updateRows(tabId);
+      const sym = b.dataset.remove;
+      state.watchlist = state.watchlist.filter(s => s !== sym);
+      saveWatchlist();
+      renderView();
     })
   );
 
-  const debouncedFilterUpdate = debounce(() => {
-    if (state.activeTab !== tabId) return;
-    state.showAllRows = false;
-    renderTabs();
-    updateRows(tabId);
-  }, 150);
-  document.querySelectorAll('.filter-row input').forEach(input => {
-    input.addEventListener('input', () => {
-      if (input.type === 'checkbox') return;
-      const col = input.dataset.col;
-      const bound = input.dataset.bound;
-      if (col === 'symbol') {
-        if (!state.filters[col]) state.filters[col] = {};
-        state.filters[col].text = input.value;
-      } else {
-        if (!state.filters[col]) state.filters[col] = {};
-        state.filters[col][bound] = input.value;
-      }
-      state.lowSignalActive = false;
-      debouncedFilterUpdate();
-    });
-    if (input.type === 'checkbox') {
-      input.addEventListener('change', () => {
-        const col = input.dataset.col;
-        const bound = input.dataset.bound;
-        if (!state.filters[col]) state.filters[col] = { above: true, below: true, ontop: true };
-        state.filters[col][bound] = input.checked;
-        state.lowSignalActive = false;
-        debouncedFilterUpdate();
-      });
-    }
+  // Edit toggle
+  const editBtn = document.getElementById('watch-edit-btn');
+  if (editBtn) editBtn.addEventListener('click', () => {
+    state.watchlistEditing = !state.watchlistEditing;
+    renderView();
   });
 
-  document.querySelectorAll('.spin-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const col = btn.dataset.col;
-      const bound = btn.dataset.bound;
-      const dir = Number(btn.dataset.dir);
-      if (!state.filters[col]) state.filters[col] = {};
-      const cur = Number(state.filters[col][bound]) || 0;
-      state.filters[col][bound] = cur + dir;
-      const input = btn.closest('.num-filter-group').querySelector('input');
-      if (input) input.value = state.filters[col][bound];
-      state.lowSignalActive = false;
-      resetTabState();
-      renderTabs();
-      updateRows(tabId);
+  // Add ticker
+  const addInput = document.getElementById('watch-add-input');
+  const addBtn = document.getElementById('watch-add-btn');
+  if (addInput) {
+    addInput.addEventListener('input', () => {
+      addInput.value = addInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
     });
-  });
-}
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAdd();
+    });
+  }
+  if (addBtn) addBtn.addEventListener('click', doAdd);
 
-function attachShowAllListener(tabId) {
-  const el = document.querySelector('.show-all-row');
-  if (el) el.addEventListener('click', () => { state.showAllRows = true; updateRows(tabId); });
-}
-
-function updateRowCount(filteredCount, totalCount) {
-  const el = document.querySelector('.row-count');
-  if (!el) return false;
-  el.innerHTML = `Showing <strong>${filteredCount}</strong> of <strong>${totalCount}</strong>`;
-  return true;
-}
-
-/* ── Main tab display ── */
-
-function renderSortableTable(tabId, cols) {
-  console.log('renderSortableTable: starting', tabId);
-  const def = { cols };
-  const allRows = state.data[tabId] || [];
-  let rows = applyFilters([...allRows], cols);
-  sortRows(rows);
-
-  const totalSourced = allRows.filter(row => matchesSources(row.symbol, row)).length;
-  console.log('renderSortableTable: rows filtered', rows.length, 'total', totalSourced);
-  renderToolbar(rows.length, totalSourced);
-
-  const ths = renderTableHeader(def);
-  const filterCells = renderFilterRow(def);
-  const body = renderTbodyHTML(rows, cols, null, tabId);
-
-  console.log('renderSortableTable: updating innerHTML');
-  const contentEl = document.getElementById('content');
-  contentEl.innerHTML =
-    `<div class="table-wrap"><table>` +
-    `<thead><tr>${ths}</tr><tr class="filter-row">${filterCells}</tr></thead>` +
-    `<tbody>${body}</tbody>` +
-    `</table></div>`;
-  console.log('renderSortableTable: update complete, current innerHTML length:', contentEl.innerHTML.length);
-
-  attachFilterListeners(def, tabId);
-  attachShowAllListener(tabId);
-}
-
-function showTab(tabId) {
-  console.log('showTab: starting', tabId);
-  const def = TAB_DEFS.find(t => t.id === tabId);
-
-  if (def.special) {
-    console.log('showTab: rendering special tab', def.special);
-    showSpecialTab(def);
-    return;
+  function doAdd() {
+    const sym = (addInput.value || '').trim().toUpperCase();
+    if (!sym) return;
+    if (state.watchlist.includes(sym)) { addInput.value = ''; return; }
+    state.watchlist.push(sym);
+    saveWatchlist();
+    addInput.value = '';
+    renderView();
   }
 
-  console.log('showTab: rendering sortable table');
-  renderSortableTable(tabId, def.cols);
+  // Lookback buttons
+  document.querySelectorAll('.lookback-btn').forEach(b =>
+    b.addEventListener('click', () => switchWeek(b.dataset.week))
+  );
 }
 
-const SPECIAL_TAB_COLS = {
-  performance: ['symbol','close','ytdPct','return1Y','return5Y','highPct','lowPct','forwardPE','pctSma200d','pctSma200w'],
-  priceBreaks: ['symbol','close','breakoutPrice','breakoutDate','breakoutPct','breakdownPrice','breakdownDate','breakdownPct'],
-};
+/* ─────────────────────────────────────────────
+   CROSSES VIEW
+   ───────────────────────────────────────────── */
 
-function updateRows(tabId) {
-  const def = TAB_DEFS.find(t => t.id === tabId);
-  const cols = def.cols || SPECIAL_TAB_COLS[tabId];
-  if (!cols) return;
-  const allRows = state.data[tabId] || [];
-  let rows = applyFilters([...allRows], cols);
-  sortRows(rows);
+function getCrossRows() {
+  const tf = state.crossTimeframe;
+  const dir = state.crossDirection;
+  const files = FILES[tf];
+  if (!files) return [];
 
-  const totalSourced = allRows.filter(r => matchesSources(r.symbol, r)).length;
-  if (!updateRowCount(rows.length, totalSourced)) renderToolbar(rows.length, totalSourced);
+  const file = files[dir];
+  const key = files[`${dir}Key`];
+  const json = state.raw[file];
+  if (!json) return [];
 
-  const tbody = document.querySelector('.table-wrap tbody');
-  if (!tbody) return;
-  tbody.innerHTML = renderTbodyHTML(rows, cols, def.pctField, tabId);
-  attachShowAllListener(tabId);
-}
+  let rows = json[key] || [];
 
-/* ── Formatting ── */
-
-function fmtNum(col, v) {
-  if (v == null) return '\u2014';
-  if (col === 'close' || col === 'ema' || col === 'breakoutPrice' || col === 'breakdownPrice' || col === 'spikeClose' || col === 'high3yr' || col === 'low52wk') return v.toFixed(2);
-  if (col === 'pct' || col === 'ytdPct' || col === 'highPct' || col === 'lowPct' || col === 'breakoutPct' || col === 'breakdownPct' || col === 'pctGain' || col === 'pctSma200d' || col === 'pctSma200w') return (v > 0 ? '+' : '') + v.toFixed(2) + '%';
-  if (col === 'rsi') return v.toFixed(1);
-  if (col === 'forwardPE') return v.toFixed(1);
-  return v.toLocaleString();
-}
-
-function formatStatus(status) {
-  if (!status || status.above == null) return '\u2014';
-  const isOnTop = Math.abs(status.pctDiff || 0) <= 1.5;
-  if (isOnTop) return `<span style="color:var(--blue)">On-Top</span>`;
-  const cls = status.above ? 'pct-positive' : 'pct-negative';
-  return `<span class="${cls}">${status.above ? 'Above' : 'Below'}</span>`;
-}
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-function populateTabData(byUrl) {
-  state.tabCountCache = {};
-  TAB_DEFS.forEach(t => {
-    if (t.special) return;
-    const json = byUrl[t.file];
-    if (!json) { state.data[t.id] = []; return; }
-    let rows;
-    // Backward compat: old format had "below" with "weeksBelow" field
-    if (t.key === 'weekBelow' && !json.weekBelow && json.below) {
-      rows = json.below.map(row => ({...row, count: row.weeksBelow ?? row.count}));
-    } else {
-      rows = json[t.key] || [];
-    }
-    state.data[t.id] = enrichRows(rows, t);
-  });
-  buildSpecialTabData();
-}
-
-function enrichRows(rows, t) {
-  return rows.map(r => {
-    const s = state.statsMap[r.symbol] || {};
+  // Enrich with stats (sector tag, ytd, etc.)
+  rows = rows.map(r => {
+    const s = state.stats[r.symbol] || {};
     return {
       ...r,
       name: r.name || s.name || '',
-      pct: r[t.pctField] != null ? r[t.pctField] : null,
       ytdPct: s.ytdPct ?? null,
-      highPct: s.highPct ?? null,
-      lowPct: s.lowPct ?? null,
+      return1Y: s.return1Y ?? null,
       rsi: s.rsi ?? null,
       forwardPE: s.forwardPE ?? null,
       marketCap: s.marketCap ?? null,
       emaStatus: s.emaStatus || {},
-      wkStatus: formatStatus(s.emaStatus?.weekly),
-      moStatus: formatStatus(s.emaStatus?.monthly),
-      qtrStatus: formatStatus(s.emaStatus?.quarterly),
     };
+  });
+
+  // Filter
+  if (state.crossFilter === 'watch') {
+    const w = new Set(state.watchlist);
+    rows = rows.filter(r => w.has(r.symbol));
+  } else if (state.crossFilter === 'sectors') {
+    const sectorSet = new Set(SECTOR_ORDER);
+    rows = rows.filter(r => sectorSet.has(r.symbol));
+  } else if (state.crossFilter === 'mega') {
+    rows = rows.filter(r => r.marketCap >= 200_000_000_000);
+  } else if (state.crossFilter === 'small') {
+    rows = rows.filter(r => r.marketCap > 0 && r.marketCap < 200_000_000_000);
+  }
+
+  // Search
+  if (state.crossSearch) {
+    const q = state.crossSearch.toLowerCase();
+    rows = rows.filter(r =>
+      r.symbol.toLowerCase().includes(q) ||
+      (r.name || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Default sort: for "up", rank by weeksBelow desc (longer below = stronger reversal); for "down" by weeksAbove desc; for above/below by count desc.
+  const sortKey = (dir === 'up' || dir === 'above') ? COUNT_KEYS[tf].up
+                : (dir === 'down' || dir === 'below') ? COUNT_KEYS[tf].down
+                : null;
+
+  if (dir === 'above' || dir === 'below') {
+    rows.sort((a, b) => (b.count || 0) - (a.count || 0));
+  } else if (sortKey) {
+    rows.sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
+  }
+
+  return rows;
+}
+
+function renderCrosses() {
+  const rows = getCrossRows();
+  const tf = state.crossTimeframe;
+  const dir = state.crossDirection;
+  const dirCls = (dir === 'up' || dir === 'above') ? 'up' : (dir === 'down' || dir === 'below') ? 'down' : '';
+
+  const tfSeg = ['weekly','monthly','quarterly'].map(t => {
+    const lbl = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly' }[t];
+    return `<button class="seg-btn${state.crossTimeframe === t ? ' active' : ''}" data-tf="${t}">${lbl}</button>`;
+  }).join('');
+
+  const dirSeg = ['up','down','above','below'].map(d => {
+    const lbl = { up: 'Cross Up', down: 'Cross Down', above: 'Above', below: 'Below' }[d];
+    const cls = (d === 'up' || d === 'above') ? 'up' : 'down';
+    return `<button class="seg-btn ${cls}${state.crossDirection === d ? ' active' : ''}" data-dir="${d}">${lbl}</button>`;
+  }).join('');
+
+  const chips = [
+    { id: 'all',     label: 'All' },
+    { id: 'watch',   label: '★ Watchlist' },
+    { id: 'sectors', label: 'Sectors' },
+    { id: 'mega',    label: '$200B+' },
+    { id: 'small',   label: '$200B−' },
+  ].map(c => `<button class="fchip${state.crossFilter === c.id ? ' active' : ''}" data-fchip="${c.id}">${c.label}</button>`).join('');
+
+  const cardHTML = rows.map(r => renderCrossCard(r, tf, dir, dirCls)).join('');
+  const empty = rows.length === 0 ? `<div class="empty-state"><div class="glyph">∅</div>No matches.</div>` : '';
+
+  const titleLeft = { up: 'Cross Ups', down: 'Cross Downs', above: 'Above EMA', below: 'Below EMA' }[dir];
+  const tfWord = { weekly: 'weekly', monthly: 'monthly', quarterly: 'quarterly' }[tf];
+
+  return `
+    <div class="section">
+      <div class="section-head">
+        <h2 class="section-title">${esc(titleLeft)} · <em>${esc(tfWord)}</em></h2>
+        <span class="count-pill">${rows.length}</span>
+      </div>
+
+      <div class="seg-row">
+        <div class="seg">${tfSeg}</div>
+        <div class="seg">${dirSeg}</div>
+      </div>
+
+      <div class="chips-row">${chips}</div>
+
+      <div class="cross-search-wrap">
+        <span class="cross-search-ic">⌕</span>
+        <input class="cross-search-input" id="cross-search" placeholder="Search symbol or name…" value="${esc(state.crossSearch)}" autocomplete="off" />
+      </div>
+
+      ${empty}
+      <div class="cross-list">${cardHTML}</div>
+    </div>
+  `;
+}
+
+function renderCrossCard(r, tf, dir, dirCls) {
+  const tfShort = { weekly: 'wk', monthly: 'mo', quarterly: 'qtr' }[tf];
+  const intv = tf === 'monthly' ? 'M' : tf === 'quarterly' ? 'M' : 'W';
+
+  const pctField = (dir === 'up' || dir === 'above') ? 'pctAbove' : 'pctBelow';
+  const pct = r[pctField];
+
+  // Signal line
+  let signal = '';
+  if (dir === 'up') {
+    const n = r[COUNT_KEYS[tf].up] ?? 0;
+    signal = `<span class="glyph up">▲</span> Crossed up after <strong>${n}</strong> ${tfShort}${n === 1 ? '' : 's'} below`;
+  } else if (dir === 'down') {
+    const n = r[COUNT_KEYS[tf].down] ?? 0;
+    signal = `<span class="glyph down">▼</span> Crossed down after <strong>${n}</strong> ${tfShort}${n === 1 ? '' : 's'} above`;
+  } else if (dir === 'above') {
+    signal = `<span class="glyph up">▲</span> <strong>${r.count}</strong> ${tfShort}${r.count === 1 ? '' : 's'} above EMA`;
+  } else {
+    signal = `<span class="glyph down">▼</span> <strong>${r.count}</strong> ${tfShort}${r.count === 1 ? '' : 's'} below EMA`;
+  }
+
+  const isWatch = state.watchlist.includes(r.symbol);
+  const isSector = SECTOR_ORDER.includes(r.symbol);
+  const tag = isWatch ? '<span class="ext" style="color:var(--warn);border-color:rgba(251,191,36,0.4)">★ WATCH</span>'
+            : isSector ? `<span class="ext">SECTOR</span>` : '';
+
+  return `
+    <button class="cross-card ${dirCls}" data-sym="${esc(r.symbol)}">
+      <div class="cross-l">
+        <div class="cross-sym">
+          <span class="ticker">${esc(r.symbol)}</span>
+          ${tag}
+        </div>
+        ${r.name ? `<div class="cross-name">${esc(r.name)}</div>` : ''}
+        <div class="cross-signal">${signal}</div>
+      </div>
+      <div class="cross-r">
+        <span class="cross-price">$${fmtPrice(r.close)}</span>
+        <span class="cross-pct ${dirCls}">${pct != null ? (pct > 0 ? '+' : '') + pct.toFixed(2) + '%' : '—'}</span>
+        <span class="cross-meta">EMA ${fmtPrice(r.ema)}</span>
+      </div>
+    </button>
+  `;
+}
+
+function wireCrosses() {
+  document.querySelectorAll('[data-tf]').forEach(b =>
+    b.addEventListener('click', () => { state.crossTimeframe = b.dataset.tf; renderView(); })
+  );
+  document.querySelectorAll('[data-dir]').forEach(b =>
+    b.addEventListener('click', () => { state.crossDirection = b.dataset.dir; renderView(); })
+  );
+  document.querySelectorAll('[data-fchip]').forEach(b =>
+    b.addEventListener('click', () => { state.crossFilter = b.dataset.fchip; renderView(); })
+  );
+  document.querySelectorAll('.cross-card[data-sym]').forEach(b =>
+    b.addEventListener('click', () => openSymbolSheet(b.dataset.sym))
+  );
+
+  const search = document.getElementById('cross-search');
+  if (search) {
+    const update = debounce(() => {
+      state.crossSearch = search.value.trim();
+      // Only re-render the cards, not the whole page (so search input keeps focus)
+      const rows = getCrossRows();
+      const tf = state.crossTimeframe, dir = state.crossDirection;
+      const dirCls = (dir === 'up' || dir === 'above') ? 'up' : 'down';
+      const list = document.querySelector('.cross-list');
+      const pill = document.querySelector('.count-pill');
+      if (list) list.innerHTML = rows.map(r => renderCrossCard(r, tf, dir, dirCls)).join('');
+      if (pill) pill.textContent = rows.length;
+      // Rewire just the cards
+      document.querySelectorAll('.cross-card[data-sym]').forEach(b => {
+        b.addEventListener('click', () => openSymbolSheet(b.dataset.sym));
+      });
+      // Empty state
+      const existingEmpty = document.querySelector('.cross-list').previousElementSibling;
+      if (existingEmpty && existingEmpty.classList.contains('empty-state')) existingEmpty.remove();
+      if (rows.length === 0) {
+        const div = document.createElement('div');
+        div.className = 'empty-state';
+        div.innerHTML = '<div class="glyph">∅</div>No matches.';
+        document.querySelector('.cross-list').parentNode.insertBefore(div, document.querySelector('.cross-list'));
+      }
+    }, 120);
+    search.addEventListener('input', update);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   MORE VIEW
+   ───────────────────────────────────────────── */
+
+function renderMore() {
+  return [
+    moreSection('benchmarks', 'Index <em>&amp; Sector</em> Returns', renderBenchTable()),
+    moreSection('breadth', 'Breadth <em>statistics</em>', renderBreadthDetail()),
+    moreSection('milestones', 'SPX <em>milestones</em>', renderMilestonesDetail()),
+    moreSection('breaks', 'Recent <em>price</em> breaks', renderPriceBreaks()),
+    moreSection('extremes', 'YTD <em>extremes</em>', renderYTDExtremes()),
+  ].join('');
+}
+
+function moreSection(id, titleHTML, body) {
+  const open = state.moreOpen[id] ? ' open' : '';
+  return `
+    <div class="more-section${open}" data-more="${id}">
+      <div class="more-section-head">
+        <h3 class="more-section-title">${titleHTML}</h3>
+        <span class="more-section-chev">▾</span>
+      </div>
+      <div class="more-section-body">${body}</div>
+    </div>
+  `;
+}
+
+function renderBenchTable() {
+  const bench = state.misc?.benchmarkByTicker || {};
+  if (Object.keys(bench).length === 0) return '<div class="empty-state">No benchmark data.</div>';
+
+  // Order: SPY first, then sectors, then others
+  const order = ['SPY','QQQ','DIA','IWM','VTV','TMUS', ...SECTOR_ORDER.filter(s => s !== 'SPY')];
+  const seen = new Set();
+  const ordered = order.filter(s => bench[s] && !seen.has(s) && seen.add(s));
+  Object.keys(bench).forEach(s => { if (!seen.has(s)) { ordered.push(s); seen.add(s); } });
+
+  const rows = [
+    `<div class="bench-row hdr"><div>Symbol</div><div style="text-align:right">YTD</div><div style="text-align:right">1Y</div><div style="text-align:right">5Y</div></div>`,
+    ...ordered.map(sym => {
+      const b = bench[sym];
+      return `
+        <div class="bench-row" data-sym="${sym}">
+          <span class="bench-sym">${sym}</span>
+          <span class="bench-cell ${upDownCls(b.ytd)}">${fmtPct(b.ytd)}</span>
+          <span class="bench-cell ${upDownCls(b.oneY)}">${fmtPct(b.oneY)}</span>
+          <span class="bench-cell ${upDownCls(b.fiveY)}">${fmtPct(b.fiveY, { decimals: 0 })}</span>
+        </div>`;
+    }),
+  ].join('');
+
+  return `<div class="bench">${rows}</div>`;
+}
+
+function renderBreadthDetail() {
+  const m = state.misc || {};
+  const items = [
+    { key: 'pctAbove5wkEMA', label: 'Above 5W EMA', fmt: 'pct1' },
+    { key: 'pctBelow5wkEMA', label: 'Below 5W EMA', fmt: 'pct1' },
+    { key: 'pctAbove200dSMA', label: 'Above 200D SMA', fmt: 'pct1' },
+    { key: 'pctAbove200wSMA', label: 'Above 200W SMA', fmt: 'pct1' },
+    { key: 'pctWithin5OfHigh', label: 'Within 5% of High', fmt: 'pct1' },
+    { key: 'pctPositiveYTD', label: 'Positive YTD', fmt: 'pct1' },
+    { key: 'avgYTD', label: 'Avg YTD', fmt: 'pct2' },
+    { key: 'avgForwardPE', label: 'Avg Fwd P/E', fmt: 'num' },
+    { key: 'medianForwardPE', label: 'Median Fwd P/E', fmt: 'num' },
+  ];
+
+  const cells = items.map(it => {
+    const v = m[it.key];
+    let val = '—', cls = '';
+    if (v != null) {
+      if (it.fmt === 'pct1') { val = v.toFixed(1) + '%'; cls = v >= 50 ? 'up' : (it.key === 'pctBelow5wkEMA' ? 'down' : ''); }
+      else if (it.fmt === 'pct2') { val = (v > 0 ? '+' : '') + v.toFixed(2) + '%'; cls = upDownCls(v); }
+      else if (it.fmt === 'num') val = v.toFixed(1);
+    }
+    return `<div class="kv"><span class="kv-key">${it.label}</span><span class="kv-val ${cls}">${val}</span></div>`;
+  }).join('');
+
+  return `<div class="kv-grid">${cells}</div>`;
+}
+
+function renderMilestonesDetail() {
+  const m = state.misc || {};
+  const items = [
+    { key: 'spxSinceElection',     label: 'Since Election (Nov 5, 2024)' },
+    { key: 'spxSinceInauguration', label: 'Since Inauguration (Jan 20, 2025)' },
+    { key: 'spxSinceChatGPT',      label: 'Since ChatGPT (Nov 30, 2022)' },
+    { key: 'spxSinceBottom2022',   label: 'Since 2022 Low (Oct 12, 2022)' },
+  ];
+  const cells = items.map(it => {
+    const v = m[it.key];
+    const val = v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+    return `<div class="kv"><span class="kv-key">${it.label}</span><span class="kv-val ${upDownCls(v)}">${val}</span></div>`;
+  }).join('');
+  return `<div class="kv-grid">${cells}</div>`;
+}
+
+function renderPriceBreaks() {
+  const stats = Object.values(state.stats).filter(s =>
+    s.symbol && (s.breakoutPct != null || s.breakdownPct != null)
+  );
+
+  const recentBreaks = stats
+    .filter(s => s.breakoutDate || s.breakdownDate)
+    .sort((a, b) => {
+      const ad = a.breakoutDate || a.breakdownDate || '';
+      const bd = b.breakoutDate || b.breakdownDate || '';
+      return bd.localeCompare(ad);
+    })
+    .slice(0, 25);
+
+  if (recentBreaks.length === 0) return '<div class="empty-state">No recent breaks.</div>';
+
+  const rows = recentBreaks.map(s => {
+    const isBreakout = s.breakoutDate && (!s.breakdownDate || s.breakoutDate > s.breakdownDate);
+    const date = isBreakout ? s.breakoutDate : s.breakdownDate;
+    const price = isBreakout ? s.breakoutPrice : s.breakdownPrice;
+    const pct = isBreakout ? s.breakoutPct : s.breakdownPct;
+    const cls = isBreakout ? 'up' : 'down';
+    const sign = isBreakout ? '▲' : '▼';
+
+    return `
+      <button class="cross-card ${cls}" data-sym="${s.symbol}">
+        <div class="cross-l">
+          <div class="cross-sym"><span class="ticker">${esc(s.symbol)}</span></div>
+          ${s.name ? `<div class="cross-name">${esc(s.name)}</div>` : ''}
+          <div class="cross-signal"><span class="glyph ${cls}">${sign}</span> ${isBreakout ? 'Breakout' : 'Breakdown'} on <strong>${esc(date)}</strong> @ $${fmtPrice(price)}</div>
+        </div>
+        <div class="cross-r">
+          <span class="cross-price">$${fmtPrice(s.close)}</span>
+          <span class="cross-pct ${cls}">${fmtPct(pct)}</span>
+        </div>
+      </button>`;
+  }).join('');
+
+  return `<div class="cross-list">${rows}</div>`;
+}
+
+function renderYTDExtremes() {
+  const stats = Object.values(state.stats).filter(s => s.symbol && s.ytdPct != null && s.marketCap >= 10_000_000_000);
+  const sorted = [...stats].sort((a, b) => b.ytdPct - a.ytdPct);
+  const winners = sorted.slice(0, 10);
+  const losers = sorted.slice(-10).reverse();
+
+  const block = (title, rows) => `
+    <div class="sheet-mini-section">
+      <div class="sheet-mini-title">${title}</div>
+      <div class="cross-list">
+        ${rows.map(s => {
+          const cls = upDownCls(s.ytdPct);
+          return `
+            <button class="cross-card ${cls}" data-sym="${s.symbol}">
+              <div class="cross-l">
+                <div class="cross-sym"><span class="ticker">${esc(s.symbol)}</span></div>
+                ${s.name ? `<div class="cross-name">${esc(s.name)}</div>` : ''}
+              </div>
+              <div class="cross-r">
+                <span class="cross-price">$${fmtPrice(s.close)}</span>
+                <span class="cross-pct ${cls}">${fmtPct(s.ytdPct)}</span>
+              </div>
+            </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  return block('Top 10 (≥ $10B cap)', winners) + block('Bottom 10 (≥ $10B cap)', losers);
+}
+
+function wireMore() {
+  document.querySelectorAll('.more-section-head').forEach(h => {
+    h.addEventListener('click', () => {
+      const sec = h.closest('.more-section');
+      const id = sec.dataset.more;
+      sec.classList.toggle('open');
+      state.moreOpen[id] = sec.classList.contains('open');
+    });
+  });
+  document.querySelectorAll('.bench-row[data-sym], .cross-card[data-sym]').forEach(b =>
+    b.addEventListener('click', () => openSymbolSheet(b.dataset.sym))
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SYMBOL DETAIL SHEET
+   ───────────────────────────────────────────── */
+
+function openSymbolSheet(sym) {
+  const s = state.stats[sym] || {};
+  const isWatch = state.watchlist.includes(sym);
+  const head = document.getElementById('sheet-head');
+  const body = document.getElementById('sheet-body');
+
+  const name = s.name || SECTOR_NAMES[sym] || '';
+  const close = s.close;
+
+  head.innerHTML = `
+    <div class="sheet-title">${esc(sym)} <em>${name ? '· ' + esc(name) : ''}</em></div>
+    <div class="sheet-sub">${close != null ? '$' + fmtPrice(close) : '—'}</div>
+  `;
+
+  // EMA status
+  const e = s.emaStatus || {};
+  const emaText = (st) => {
+    if (!st || st.above == null) return '—';
+    const onTop = Math.abs(st.pctDiff || 0) <= 1.5;
+    const tag = onTop ? 'On-top' : (st.above ? 'Above' : 'Below');
+    const cls = onTop ? 'warn' : (st.above ? 'up' : 'down');
+    return `<span class="${cls}">${tag} (${(st.pctDiff > 0 ? '+' : '') + (st.pctDiff || 0).toFixed(2)}%)</span> · ${st.count} ${st.above ? 'above' : 'below'}`;
+  };
+
+  const row = (k, v, cls = '') =>
+    `<div class="sheet-row"><span class="sheet-row-key">${esc(k)}</span><span class="sheet-row-val ${cls}">${v}</span></div>`;
+
+  const bench = state.misc?.benchmarkByTicker?.[sym];
+
+  let html = '<div class="sheet-rows">';
+  if (s.ytdPct != null) html += row('YTD', fmtPct(s.ytdPct), upDownCls(s.ytdPct));
+  if (s.return1Y != null) html += row('1 Year', fmtPct(s.return1Y), upDownCls(s.return1Y));
+  if (s.return5Y != null) html += row('5 Year', fmtPct(s.return5Y, { decimals: 0 }), upDownCls(s.return5Y));
+  if (bench && bench.fiveY != null && s.return5Y == null) html += row('5 Year', fmtPct(bench.fiveY, { decimals: 0 }), upDownCls(bench.fiveY));
+  if (s.highPct != null) html += row('From 3yr High', fmtPct(s.highPct), s.highPct >= -5 ? 'up' : 'down');
+  if (s.lowPct != null) html += row('From 52w Low', fmtPct(s.lowPct), s.lowPct > 5 ? 'up' : 'down');
+  if (s.rsi != null) html += row('RSI(14)', s.rsi.toFixed(1), s.rsi > 70 ? 'down' : s.rsi < 30 ? 'up' : '');
+  if (s.forwardPE != null) html += row('Fwd P/E', s.forwardPE.toFixed(1));
+  if (s.pctSma200d != null) html += row('vs 200D SMA', fmtPct(s.pctSma200d), upDownCls(s.pctSma200d));
+  if (s.pctSma200w != null) html += row('vs 200W SMA', fmtPct(s.pctSma200w), upDownCls(s.pctSma200w));
+  html += '</div>';
+
+  // EMA status section
+  html += `
+    <div class="sheet-mini-section">
+      <div class="sheet-mini-title">5-Period EMA · status</div>
+      <div class="sheet-rows">
+        ${row('Weekly', emaText(e.weekly))}
+        ${row('Monthly', emaText(e.monthly))}
+        ${row('Quarterly', emaText(e.quarterly))}
+      </div>
+    </div>
+  `;
+
+  // Breakouts
+  if (s.breakoutPct != null || s.breakdownPct != null) {
+    html += '<div class="sheet-mini-section"><div class="sheet-mini-title">Swing levels</div><div class="sheet-rows">';
+    if (s.breakoutPrice != null) html += row(`Breakout (${esc(s.breakoutDate || '')})`, `$${fmtPrice(s.breakoutPrice)} · ${fmtPct(s.breakoutPct)}`, upDownCls(s.breakoutPct));
+    if (s.breakdownPrice != null) html += row(`Breakdown (${esc(s.breakdownDate || '')})`, `$${fmtPrice(s.breakdownPrice)} · ${fmtPct(s.breakdownPct)}`, upDownCls(s.breakdownPct));
+    html += '</div></div>';
+  }
+
+  // Actions
+  html += `
+    <div class="sheet-actions">
+      <button class="sheet-pin-btn ${isWatch ? 'pinned' : ''}" id="sheet-pin">${isWatch ? '★ Unpin' : '☆ Pin'}</button>
+      <a class="sheet-pin-btn" href="${tvLink(sym)}" target="_blank" rel="noopener">↗ TradingView</a>
+    </div>
+  `;
+
+  body.innerHTML = html;
+  showSheet();
+
+  document.getElementById('sheet-pin').addEventListener('click', () => {
+    if (state.watchlist.includes(sym)) state.watchlist = state.watchlist.filter(s => s !== sym);
+    else state.watchlist.push(sym);
+    saveWatchlist();
+    hideSheet();
+    if (state.view === 'pulse') renderView();
   });
 }
 
-/* ── Meta ── */
-
-async function renderMeta(json) {
-  console.log('renderMeta: starting');
-  if (json) state.latestJson = json;
-  const currentJson = state.latestJson || {};
-  
-  const timestamp = currentJson.scanTime ? new Date(currentJson.scanTime).toLocaleString() : '\u2014';
-  const updatedText = state.isScanning ? '<strong style="color:var(--accent)">Scan in Progress</strong>' : `<strong>${timestamp}</strong>`;
-  
-  const scanned = (currentJson.symbolsScanned || 0).toLocaleString();
-  const errs = currentJson.errors || 0;
-
-  let total = '';
-  try {
-    const cb = `_=${Date.now()}`;
-    const resp = await fetch(`/symbols/us-equities.txt?${cb}`);
-    if (resp.ok) {
-      const text = await resp.text();
-      const count = text.trim().split('\n').filter(Boolean).length;
-      total = ` / ${count.toLocaleString()}`;
-    }
-  } catch (err) { console.warn('[meta] symbol count fetch failed:', err.message); }
-
-  const errStyle = errs ? ' style="color:var(--red)"' : '';
-  const metaEl = document.getElementById('meta');
-  metaEl.innerHTML =
-    `<span class="meta">Updated ${updatedText}</span>` +
-    `<span class="meta-sep">|</span>` +
-    `<span class="meta"><a href="/symbols/us-equities.txt" target="_blank" class="meta-link">${scanned}${total} symbols</a></span>` +
-    `<span class="meta-sep">|</span>` +
-    `<span class="meta"><a href="/results/latest-errors.json" target="_blank" class="meta-link"${errStyle}>${errs} errors</a></span>`;
-  console.log('renderMeta: update complete');
+function showSheet() {
+  document.getElementById('sheet-backdrop').classList.add('open');
+  document.getElementById('sheet').classList.add('open');
+}
+function hideSheet() {
+  document.getElementById('sheet-backdrop').classList.remove('open');
+  document.getElementById('sheet').classList.remove('open');
 }
 
-/* ── Week selector ── */
+/* ─────────────────────────────────────────────
+   META & SCAN STATUS
+   ───────────────────────────────────────────── */
 
-function fileURLForWeek(latestPath, week) {
-  if (week === 'latest') return latestPath;
-  return latestPath.replace(/\/latest([-.])/g, `/${week}$1`);
-}
-
-function formatWeekLabel(dateStr) {
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const m = parseInt(parts[1], 10);
-  const d = parseInt(parts[2], 10);
-  return `${months[m - 1]} ${d}`;
-}
-
-function renderWeekSelector() {
-  const el = document.getElementById('week-selector');
-  if (state.manifest.length < 1) {
-    el.style.display = 'none';
+function renderHeaderMeta() {
+  const dot = document.getElementById('hdr-dot');
+  const meta = document.getElementById('hdr-meta');
+  if (dot) dot.classList.toggle('scanning', state.isScanning);
+  if (!meta) return;
+  if (state.isScanning) {
+    meta.innerHTML = `<span class="warn">Scanning…</span>`;
     return;
   }
-  el.style.display = '';
-  const latestCls = state.selectedWeek === 'latest' ? ' active' : '';
-  let html = `<button class="source-btn${latestCls}" data-week="latest">Latest</button>`;
-  for (const week of state.manifest) {
-    const cls = state.selectedWeek === week ? ' active' : '';
-    html += `<button class="source-btn${cls}" data-week="${esc(week)}">${formatWeekLabel(week)}</button>`;
+  const parts = [];
+  if (state.scanTime) parts.push(fmtTime(state.scanTime));
+  if (state.symbolsScanned) parts.push(`${state.symbolsScanned.toLocaleString()} symbols`);
+  if (state.errorsCount) parts.push(`<span class="err">${state.errorsCount} err</span>`);
+  meta.innerHTML = parts.join(' · ') || '—';
+}
+
+async function checkScanStatus(opts = {}) {
+  try {
+    const res = await fetch(`${ORCHESTRATOR_URL}?dev_key=${DEV_KEY}`, { method: 'GET' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const wasScanning = state.isScanning;
+    state.isScanning = !!data.running;
+    renderHeaderMeta();
+
+    const btn = document.getElementById('run-scan-btn');
+    if (state.isScanning) {
+      btn.classList.add('busy');
+      btn.disabled = true;
+      setTimeout(checkScanStatus, 30000);
+    } else {
+      btn.classList.remove('busy');
+      btn.disabled = false;
+      if (wasScanning) fetchAll(true); // just finished
+    }
+  } catch (e) {
+    console.warn('[scan] status check failed', e);
   }
-  el.innerHTML = html;
-  el.querySelectorAll('.source-btn').forEach(btn =>
-    btn.addEventListener('click', () => switchWeek(btn.dataset.week))
-  );
+}
+
+async function triggerScan() {
+  const btn = document.getElementById('run-scan-btn');
+  btn.disabled = true;
+  btn.classList.add('busy');
+  try {
+    await fetch(`${ORCHESTRATOR_URL}?dev_key=${DEV_KEY}`, { method: 'POST' });
+    setTimeout(checkScanStatus, 4000);
+  } catch (e) {
+    console.warn('[scan] trigger failed', e);
+    btn.classList.remove('busy');
+    btn.disabled = false;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   DATA LOADING
+   ───────────────────────────────────────────── */
+
+function urlsForWeek(week) {
+  const files = new Set();
+  Object.values(FILES).forEach(g => { files.add(g.up); files.add(g.down); files.add(g.above); files.add(g.below); });
+  const list = [...files];
+  if (week === 'latest') return { list, statsURL: '/results/latest-stats.json' };
+  return {
+    list: list.map(u => u.replace(/\/latest([-.])/, `/${week}$1`)),
+    statsURL: `/results/${week}-stats.json`,
+  };
+}
+
+async function fetchAll(silent = false) {
+  if (!silent) {
+    document.getElementById('main').innerHTML = '<div class="loading">Loading market…</div>';
+  }
+  const cb = `_=${Date.now()}`;
+  const { list, statsURL } = urlsForWeek(state.selectedWeek);
+
+  const [manifestR, statsR, ...results] = await Promise.allSettled([
+    fetch(`/results/manifest.json?${cb}`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(`${statsURL}?${cb}`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ...list.map(u => fetch(`${u}?${cb}`).then(r => r.ok ? r.json() : null).catch(() => null)),
+  ]);
+
+  if (manifestR.status === 'fulfilled' && manifestR.value) {
+    const m = manifestR.value;
+    state.manifest = Array.isArray(m) ? m : (m.weeks || []);
+  }
+
+  if (statsR.status === 'fulfilled' && statsR.value) {
+    const data = statsR.value;
+    state.stats = {};
+    (data.stats || []).forEach(s => { state.stats[s.symbol] = s; });
+    state.misc = data.misc || {};
+    state.scanTime = data.scanTime;
+    state.symbolsScanned = data.symbolsScanned || 0;
+    state.errorsCount = data.errors || 0;
+  }
+
+  // Try to fetch total symbols count
+  fetch(`/symbols/us-equities.txt?${cb}`).then(r => r.ok ? r.text() : '').then(txt => {
+    if (txt) {
+      state.totalSymbols = txt.trim().split('\n').filter(Boolean).length;
+      renderHeaderMeta();
+    }
+  }).catch(() => {});
+
+  state.raw = {};
+  list.forEach((u, i) => {
+    const result = results[i];
+    if (result.status === 'fulfilled' && result.value) {
+      // Map back to the latest-* form so getCrossRows can look it up
+      const canonical = u.replace(/\/\d{4}-\d{2}-\d{2}([-.])/, '/latest$1');
+      state.raw[canonical] = result.value;
+    }
+  });
+
+  renderHeaderMeta();
+  renderView();
 }
 
 async function switchWeek(week) {
   if (week === state.selectedWeek) return;
   state.selectedWeek = week;
-  renderWeekSelector();
+  await fetchAll();
+}
 
-  const cb = `_=${Date.now()}`;
-  const latestURLs = [...new Set(TAB_DEFS.filter(t => t.file).map(t => t.file))];
-  const weekURLs = latestURLs.map(u => fileURLForWeek(u, week));
-  const statsURL = fileURLForWeek('/results/latest-stats.json', week);
-  const [statsResult, ...results] = await Promise.allSettled([
-    fetch(`${statsURL}?${cb}`).then(r => {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    }),
-    ...weekURLs.map(u => fetch(`${u}?${cb}`).then(r => {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    })),
-  ]);
+/* ─────────────────────────────────────────────
+   INIT
+   ───────────────────────────────────────────── */
 
-  if (statsResult.status === 'fulfilled' && statsResult.value.stats) {
-    state.statsMap = Object.fromEntries(statsResult.value.stats.map(s => [s.symbol, s]));
-    if (statsResult.value.misc) state.statsMap._misc = statsResult.value.misc;
-  } else {
-    state.statsMap = {};
-  }
+function readHash() {
+  const h = (location.hash || '').replace('#', '');
+  if (VIEWS.includes(h)) state.view = h;
+}
 
-  const byLatestUrl = {};
-  latestURLs.forEach((u, i) => {
-    if (results[i].status === 'fulfilled') byLatestUrl[u] = results[i].value;
+function attachGlobalHandlers() {
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.addEventListener('click', () => setView(b.dataset.view));
   });
-
-  const meta = byLatestUrl[latestURLs[0]] || byLatestUrl[latestURLs[1]] || byLatestUrl[latestURLs[2]];
-  if (meta) renderMeta(meta);
-
-  populateTabData(byUrl);
-
-  renderTabs();
-  showTab(state.activeTab);
-}
-
-/* ── Special tab rendering ── */
-
-function showSpecialTab(def) {
-  if (def.special === 'miscStats') return showMiscStats();
-  if (def.special === 'summary') return showSummaryDashboard(def);
-  // All other special tabs use standard sortable/filterable table
-  return showSortableSpecialTab(def.id);
-}
-
-function showSummaryDashboard(def) {
-  console.log('showSummaryDashboard: starting', def.id);
-  const stats = Object.values(state.statsMap).filter(s => s.symbol && def.set.has(s.symbol));
-  console.log('showSummaryDashboard: found stats', stats.length);
-  state.data[def.id] = enrichRows(stats, def);
-  console.log('showSummaryDashboard: enriched rows', state.data[def.id].length);
-  renderSortableTable(def.id, def.cols);
-}
-
-function showSortableSpecialTab(tabId) {
-  const cols = SPECIAL_TAB_COLS[tabId];
-  if (!cols) return;
-  renderSortableTable(tabId, cols);
-}
-
-function showMiscStats() {
-  const misc = state.miscStats || {};
-  document.getElementById('toolbar').innerHTML = '';
-
-  const cards = [
-    { label: 'Within 5% of High', value: misc.pctWithin5OfHigh != null ? misc.pctWithin5OfHigh.toFixed(1) + '%' : '\u2014' },
-    { label: 'Positive YTD', value: misc.pctPositiveYTD != null ? misc.pctPositiveYTD.toFixed(1) + '%' : '\u2014' },
-    { label: 'Avg YTD', value: misc.avgYTD != null ? (misc.avgYTD > 0 ? '+' : '') + misc.avgYTD.toFixed(2) + '%' : '\u2014', color: misc.avgYTD != null ? (misc.avgYTD >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'Avg Fwd P/E', value: misc.avgForwardPE != null ? misc.avgForwardPE.toFixed(1) : '\u2014' },
-    { label: 'Median Fwd P/E', value: misc.medianForwardPE != null ? misc.medianForwardPE.toFixed(1) : '\u2014' },
-    { label: 'Above 5wk EMA', value: misc.pctAbove5wkEMA != null ? misc.pctAbove5wkEMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove5wkEMA != null ? 'var(--green)' : null },
-    { label: 'Below 5wk EMA', value: misc.pctBelow5wkEMA != null ? misc.pctBelow5wkEMA.toFixed(1) + '%' : '\u2014', color: misc.pctBelow5wkEMA != null ? 'var(--red)' : null },
-    { label: 'Above 200D SMA', value: misc.pctAbove200dSMA != null ? misc.pctAbove200dSMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove200dSMA != null ? 'var(--green)' : null },
-    { label: 'Above 200W SMA', value: misc.pctAbove200wSMA != null ? misc.pctAbove200wSMA.toFixed(1) + '%' : '\u2014', color: misc.pctAbove200wSMA != null ? 'var(--green)' : null },
-    { label: 'SPX Since Election', value: misc.spxSinceElection != null ? (misc.spxSinceElection > 0 ? '+' : '') + misc.spxSinceElection.toFixed(2) + '%' : '\u2014', color: misc.spxSinceElection != null ? (misc.spxSinceElection >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'SPX Since Inauguration', value: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration > 0 ? '+' : '') + misc.spxSinceInauguration.toFixed(2) + '%' : '\u2014', color: misc.spxSinceInauguration != null ? (misc.spxSinceInauguration >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'SPX Since 2022 Bottom', value: misc.spxSinceBottom2022 != null ? (misc.spxSinceBottom2022 > 0 ? '+' : '') + misc.spxSinceBottom2022.toFixed(2) + '%' : '\u2014', color: misc.spxSinceBottom2022 != null ? (misc.spxSinceBottom2022 >= 0 ? 'var(--green)' : 'var(--red)') : null },
-    { label: 'SPX Since ChatGPT', value: misc.spxSinceChatGPT != null ? (misc.spxSinceChatGPT > 0 ? '+' : '') + misc.spxSinceChatGPT.toFixed(2) + '%' : '\u2014', color: misc.spxSinceChatGPT != null ? (misc.spxSinceChatGPT >= 0 ? 'var(--green)' : 'var(--red)') : null },
-  ];
-
-  let html = `<div class=\"stat-grid\">` +
-    cards.map(c => {
-      const colorStyle = c.color ? ` style=\"color:${c.color}\"` : '';
-      return `<div class=\"stat-card\">` +
-        `<div class=\"stat-label\">${c.label}</div>` +
-        `<div class=\"stat-value\"${colorStyle}>${c.value}</div>` +
-        `</div>`;
-    }).join('') +
-    `</div>`;
-
-  if (misc.benchmarkByTicker) {
-    html += `<div class=\"stat-section-title\">Index & Sector Benchmarks</div>`;
-    html += `<div class=\"table-wrap benchmark-table\"><table><thead><tr><th>Symbol</th><th class=\"num\">YTD</th><th class=\"num\">1 Year</th><th class=\"num\">5 Year</th></tr></thead><tbody>`;
-    
-    Object.entries(misc.benchmarkByTicker).forEach(([sym, s]) => {
-      const ytdCls = s.ytd >= 0 ? 'pct-positive' : 'pct-negative';
-      const oneYCls = s.oneY >= 0 ? 'pct-positive' : 'pct-negative';
-      const fiveYCls = s.fiveY >= 0 ? 'pct-positive' : 'pct-negative';
-      
-      html += `<tr>` +
-        `<td class=\"symbol\">${sym}</td>` +
-        `<td class=\"num ${ytdCls}\">${s.ytd != null ? (s.ytd > 0 ? '+' : '') + s.ytd.toFixed(2) + '%' : '\u2014'}</td>` +
-        `<td class=\"num ${oneYCls}\">${s.oneY != null ? (s.oneY > 0 ? '+' : '') + s.oneY.toFixed(2) + '%' : '\u2014'}</td>` +
-        `<td class=\"num ${fiveYCls}\">${s.fiveY != null ? (s.fiveY > 0 ? '+' : '') + s.fiveY.toFixed(2) + '%' : '\u2014'}</td>` +
-        `</tr>`;
-    });
-    html += `</tbody></table></div>`;
-  }
-
-  document.getElementById('content').innerHTML = html;
-}
-
-function buildSpecialTabData() {
-  const stats = Object.values(state.statsMap).filter(s => s.symbol);
-
-  // Clear dynamic column registrations
-  state.dynPctCols = new Set();
-  state.dynPECols = new Set();
-  state.dynPEPrevCol = {};
-
-  // Performance
-  state.data['performance'] = stats.map(s => ({
-    symbol: s.symbol, name: s.name || '', close: s.close ?? null,
-    ytdPct: s.ytdPct ?? null, return1Y: s.return1Y ?? null, return5Y: s.return5Y ?? null,
-    highPct: s.highPct ?? null, lowPct: s.lowPct ?? null,
-    rsi: s.rsi ?? null, forwardPE: s.forwardPE ?? null,
-    pctSma200d: s.pctSma200d ?? null, pctSma200w: s.pctSma200w ?? null,
-    marketCap: s.marketCap ?? null,
-  }));
-
-  // Price Breaks — single combined table
-  state.data['priceBreaks'] = stats
-    .filter(s => s.breakoutPct != null || s.breakdownPct != null)
-    .map(s => ({
-      symbol: s.symbol, name: s.name || '', close: s.close ?? null,
-      breakoutPrice: s.breakoutPrice ?? null, breakoutDate: s.breakoutDate ?? null, breakoutPct: s.breakoutPct ?? null,
-      breakdownPrice: s.breakdownPrice ?? null, breakdownDate: s.breakdownDate ?? null, breakdownPct: s.breakdownPct ?? null,
-      rsi: s.rsi ?? null,
-      marketCap: s.marketCap ?? null,
-    }));
-
-  // Quarterly — Since Quarter
-  _buildQuarterlyData(stats, 'sinceQuarter', 'sinceQ');
-  _buildQuarterlyData(stats, 'duringQuarter', 'duringQ');
-
-  // Forward P/E
-  _buildForwardPEData(stats);
-
-  // VIX Spikes
-  _buildVixSpikeData(stats);
-
-  // Misc Stats
-  state.data['miscStats'] = [];
-  state.miscStats = state.statsMap._misc || {};
-}
-
-function _buildQuarterlyData(stats, field, tabId) {
-  const filtered = stats.filter(s => s[field]);
-  const qKeySet = new Set();
-  filtered.forEach(s => Object.keys(s[field]).forEach(k => qKeySet.add(k)));
-  const qKeys = sortQuarterKeys(qKeySet);
-
-  state.data[tabId] = filtered.map(s => {
-    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null, marketCap: s.marketCap ?? null };
-    qKeys.forEach(k => { row[k] = s[field][k] ?? null; });
-    return row;
-  });
-
-  const cols = ['symbol', 'name', 'close', 'highPct', ...qKeys];
-  SPECIAL_TAB_COLS[tabId] = cols;
-  qKeys.forEach(k => {
-    COL_LABELS[k] = COL_LABELS[k] || k;
-    NUM_COLS.add(k);
-    state.dynPctCols.add(k);
+  document.getElementById('run-scan-btn').addEventListener('click', triggerScan);
+  document.getElementById('sheet-backdrop').addEventListener('click', hideSheet);
+  window.addEventListener('hashchange', () => {
+    readHash();
+    renderNav();
+    renderView();
   });
 }
 
-function _buildForwardPEData(stats) {
-  const filtered = stats.filter(s => s.forwardPEHistory);
-  const qKeySet = new Set();
-  filtered.forEach(s => Object.keys(s.forwardPEHistory).forEach(k => qKeySet.add(k)));
-  const qKeys = sortQuarterKeys(qKeySet);
-
-  state.data['fwdPE'] = filtered.map(s => {
-    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, forwardPE: s.forwardPE ?? null, marketCap: s.marketCap ?? null };
-    qKeys.forEach(k => { row[k] = s.forwardPEHistory[k] ?? null; });
-    return row;
-  });
-
-  const cols = ['symbol', 'name', 'close', 'forwardPE', ...qKeys];
-  SPECIAL_TAB_COLS['fwdPE'] = cols;
-  qKeys.forEach((k, i) => {
-    COL_LABELS[k] = COL_LABELS[k] || k;
-    NUM_COLS.add(k);
-    state.dynPECols.add(k);
-    if (i > 0) state.dynPEPrevCol[k] = qKeys[i - 1];
-  });
-}
-
-function _buildVixSpikeData(stats) {
-  const filtered = stats.filter(s => s.vixReturns && s.vixReturns.length);
-  const spikeDateSet = new Set();
-  filtered.forEach(s => s.vixReturns.forEach(ret => spikeDateSet.add(ret.dateString)));
-  const spikeDates = [...spikeDateSet];
-
-  // Collect VIX close for labels; parse M/D/YY dates to sort newest-first
-  const spikeVixClose = {};
-  filtered.forEach(s => s.vixReturns.forEach(ret => {
-    if (!spikeVixClose[ret.dateString]) spikeVixClose[ret.dateString] = ret.vixClose;
-  }));
-  function parseMDYY(s) {
-    const [m, d, y] = s.split('/').map(Number);
-    return new Date(2000 + y, m - 1, d).getTime();
-  }
-  spikeDates.sort((a, b) => parseMDYY(b) - parseMDYY(a));
-
-  state.data['vixSpikes'] = filtered.map(s => {
-    const row = { symbol: s.symbol, name: s.name || '', close: s.close ?? null, highPct: s.highPct ?? null, marketCap: s.marketCap ?? null };
-    const gainByDate = {};
-    s.vixReturns.forEach(ret => { gainByDate[ret.dateString] = ret.pctGain; });
-    spikeDates.forEach(dateStr => { row['spike_' + dateStr] = gainByDate[dateStr] ?? null; });
-    return row;
-  });
-
-  const spikeCols = spikeDates.map(dateStr => 'spike_' + dateStr);
-  const cols = ['symbol', 'name', 'close', 'highPct', ...spikeCols];
-  SPECIAL_TAB_COLS['vixSpikes'] = cols;
-  spikeCols.forEach((spikeCol, idx) => {
-    const dateStr = spikeDates[idx];
-    COL_LABELS[spikeCol] = `${dateStr} (${spikeVixClose[dateStr]?.toFixed(1) || ''})`;
-    NUM_COLS.add(spikeCol);
-    state.dynPctCols.add(spikeCol);
-  });
-}
-
-/* ── Fetch & init ── */
-
-async function fetchAll(isSilentRefresh = false) {
+async function init() {
   readHash();
-
-  const btn = document.getElementById('run-scan-btn');
-  let isChecking = false;
-
-  async function checkScanStatus() {
-    if (isChecking) return;
-    isChecking = true;
-    try {
-      const res = await fetch('__ORCHESTRATOR_URL__?dev_key=__DEV_KEY__', { method: 'GET' });
-      if (res.ok) {
-        const data = await res.json();
-        const wasScanning = state.isScanning;
-        state.isScanning = data.running;
-        
-        if (state.isScanning !== wasScanning) {
-          renderMeta();
-        }
-
-        if (data.running) {
-          btn.textContent = 'Scan in Progress';
-          btn.disabled = true;
-          setTimeout(checkScanStatus, 30000); // Poll every 30s instead of 60s
-        } else {
-          if (btn.disabled && btn.textContent === 'Scan in Progress') { // just finished
-             fetchAll(true);
-          }
-          btn.textContent = 'Run Scan';
-          btn.disabled = false;
-        }
-      }
-    } catch (e) {
-      console.error('Status check failed:', e);
-    } finally {
-      isChecking = false;
-    }
-  }
-
-  // Only attach the listener once
-  if (!btn.hasAttribute('data-listener')) {
-    btn.setAttribute('data-listener', 'true');
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      btn.textContent = 'Starting...';
-      try {
-        const res = await fetch('__ORCHESTRATOR_URL__?dev_key=__DEV_KEY__', { method: 'POST' });
-        if (res.status === 429 || res.ok) {
-          btn.textContent = 'Scan in Progress';
-          setTimeout(checkScanStatus, 5000); 
-        } else {
-          btn.textContent = 'Failed';
-          setTimeout(() => { btn.textContent = 'Run Scan'; btn.disabled = false; }, 3000);
-        }
-      } catch (e) {
-        btn.textContent = 'Error';
-        setTimeout(() => { btn.textContent = 'Run Scan'; btn.disabled = false; }, 3000);
-      }
-    });
-    
-    // Kick off initial poll immediately
-    checkScanStatus();
-  }
-
-  const cb = `_=${Date.now()}`;
-  const urls = [...new Set(TAB_DEFS.filter(t => t.file).map(t => t.file))];
-  
-  if (!isSilentRefresh) {
-    document.getElementById('content').innerHTML = '<div class="loading">Loading scan data&hellip;</div>';
-  }
-
-  const [manifestResult, statsResult, ...results] = await Promise.allSettled([
-    fetch(`/results/manifest.json?${cb}`).then(r => {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    }),
-    fetch(`/results/latest-stats.json?${cb}`).then(r => {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    }),
-    ...urls.map(u => fetch(`${u}?${cb}`).then(r => {
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    })),
-  ]);
-
-  if (manifestResult.status === 'fulfilled') {
-    const mv = manifestResult.value;
-    state.manifest = Array.isArray(mv) ? mv : (mv.weeks || []);
-  }
-
-  if (statsResult.status === 'fulfilled' && statsResult.value.stats) {
-    state.statsMap = Object.fromEntries(statsResult.value.stats.map(s => [s.symbol, s]));
-    if (statsResult.value.misc) state.statsMap._misc = statsResult.value.misc;
-  }
-
-  const byUrl = {};
-  urls.forEach((u, i) => {
-    if (results[i].status === 'fulfilled') byUrl[u] = results[i].value;
-  });
-
-  const meta = byUrl[urls[0]] || byUrl[urls[1]] || byUrl[urls[2]];
-  if (meta) renderMeta(meta);
-
-  populateTabData(byUrl);
-
-  if (!Object.values(byUrl).length) {
-    document.getElementById('content').innerHTML = '<div class="error-msg">Failed to load scan data.</div>';
-    return;
-  }
-
-  initDefaultFilters();
-  renderSourceToggles();
-  renderWeekSelector();
-  renderTabs();
-  writeHash();
-  showTab(state.activeTab);
+  renderNav();
+  attachGlobalHandlers();
+  checkScanStatus();
+  await fetchAll();
 }
 
-fetchAll();
+init();
