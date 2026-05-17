@@ -76,12 +76,13 @@ resource "aws_iam_role_policy" "worker" {
         Action   = ["s3:GetObject"]
         Resource = [
           "${aws_s3_bucket.scanner.arn}/batches/*",
-          "${aws_s3_bucket.scanner.arn}/locks/*"
+          "${aws_s3_bucket.scanner.arn}/locks/*",
+          "${aws_s3_bucket.scanner.arn}/results/*"
         ]
       },
       {
         Effect = "Allow"
-        Action = ["s3:PutObject"]
+        Action = ["s3:PutObject", "s3:DeleteObject"]
         Resource = [
           "${aws_s3_bucket.scanner.arn}/batches/*",
           "${aws_s3_bucket.scanner.arn}/locks/*",
