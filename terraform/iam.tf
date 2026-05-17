@@ -74,13 +74,17 @@ resource "aws_iam_role_policy" "worker" {
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject"]
-        Resource = "${aws_s3_bucket.scanner.arn}/batches/*"
+        Resource = [
+          "${aws_s3_bucket.scanner.arn}/batches/*",
+          "${aws_s3_bucket.scanner.arn}/locks/*"
+        ]
       },
       {
         Effect = "Allow"
         Action = ["s3:PutObject"]
         Resource = [
           "${aws_s3_bucket.scanner.arn}/batches/*",
+          "${aws_s3_bucket.scanner.arn}/locks/*",
           "${aws_s3_bucket.scanner.arn}/logs/*",
           "${aws_s3_bucket.scanner.arn}/results/*"
         ]
@@ -91,7 +95,10 @@ resource "aws_iam_role_policy" "worker" {
         Resource = aws_s3_bucket.scanner.arn
         Condition = {
           StringLike = {
-            "s3:prefix" = "batches/*"
+            "s3:prefix" = [
+              "batches/*",
+              "locks/*"
+            ]
           }
         }
       },
