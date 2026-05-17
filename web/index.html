@@ -2,42 +2,46 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EMA Scanner</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83D\uDCC8</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0c">
+<title>Stonk Shop</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22%234ade80%22/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/scanner.css">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/scanner.css?v=3">
 </head>
 <body>
 
-<div class="banner">
-  <h1>EMA Scanner</h1>
-  <div id="meta"></div>
-  <button id="run-scan-btn" class="quick-btn" style="margin-left: auto;">Run Scan</button>
-</div>
-
-<div class="tabs" id="tabs"></div>
-<button class="source-drawer-toggle" id="source-drawer-toggle">
-  Filters <span class="chevron">&#9660;</span>
-  <span class="active-label" id="source-drawer-label"></span>
-</button>
-<div class="source-toggles" id="source-toggles"></div>
-<div class="source-toggles" id="week-selector" style="display:none"></div>
-<div class="sheet-overlay" id="tab-sheet-overlay">
-  <div class="sheet" id="tab-sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="tab-sheet-title"></div>
-    <div id="tab-sheet-items"></div>
+<header class="hdr">
+  <div class="hdr-left">
+    <span class="hdr-dot" id="hdr-dot"></span>
+    <span class="hdr-brand"><em>Stonk</em>Shop</span>
+    <span class="hdr-meta" id="hdr-meta">—</span>
   </div>
-</div>
-<div class="toolbar" id="toolbar"></div>
-<div class="content" id="content">
-  <div class="loading">Loading scan data&hellip;</div>
+  <button class="hdr-action" id="run-scan-btn" title="Run scan">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/></svg>
+    <span class="hdr-action-label">Scan</span>
+  </button>
+</header>
+
+<nav class="nav" id="nav">
+  <button class="nav-btn" data-view="pulse">Pulse</button>
+  <button class="nav-btn" data-view="crosses">Crosses</button>
+  <button class="nav-btn" data-view="more">More</button>
+</nav>
+
+<main id="main">
+  <div class="loading">Loading market…</div>
+</main>
+
+<div class="sheet-backdrop" id="sheet-backdrop"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-grip"></div>
+  <div class="sheet-head" id="sheet-head"></div>
+  <div class="sheet-body" id="sheet-body"></div>
 </div>
 
-<script src="js/symbols.js?v=2"></script>
-<script src="js/app.js?v=2"></script>
+<script src="js/app.js?v=3"></script>
 </body>
 </html>
