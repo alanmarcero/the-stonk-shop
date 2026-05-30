@@ -723,6 +723,36 @@ main {
   letter-spacing: 0.04em;
 }
 
+/* ─── Significance bar (feed ranking) ─── */
+
+.sig {
+  display: inline-flex;
+  gap: 2px;
+  align-self: center;
+}
+.sig i {
+  width: 8px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  transition: background 0.15s ease;
+}
+.sig-1 i:nth-child(-n+1),
+.sig-2 i:nth-child(-n+2),
+.sig-3 i:nth-child(-n+3) { background: var(--brand); }
+
+/* ─── Sort row ─── */
+
+.sort-row { align-items: center; }
+.sort-label {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  margin-right: 2px;
+}
+
 .empty-state {
   padding: 50px 20px;
   text-align: center;
