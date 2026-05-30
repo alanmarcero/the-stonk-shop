@@ -58,6 +58,7 @@ const state = {
   crossTimeframe: 'weekly',  // weekly | monthly | quarterly
   crossDirection: 'up',       // up | down | above | below
   crossFilter: 'all',         // all | watch | sectors | mega | small
+  crossSort: 'significance',  // significance | duration | size | move
   crossSearch: '',
 
   watchlist: loadWatchlist(),
@@ -98,6 +99,17 @@ const fmtPrice = (v) => {
   return v.toFixed(2);
 };
 
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+const fmtCap = (v) => {
+  if (v == null || !(v > 0)) return '—';
+  if (v >= 1e12) return `$${(v / 1e12).toFixed(v >= 1e13 ? 0 : 2)}T`;
+  if (v >= 1e9)  return `$${(v / 1e9).toFixed(v >= 1e11 ? 0 : 1)}B`;
+  if (v >= 1e6)  return `$${(v / 1e6).toFixed(0)}M`;
+  if (v >= 1e3)  return `$${(v / 1e3).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
+};
+
 const fmtTime = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -117,6 +129,56 @@ const fmtWeekLabel = (dateStr) => {
 };
 
 const upDownCls = (v) => v == null ? '' : v >= 0 ? 'up' : 'down';
+
+/* ── Significance scoring ──
+   Ranks the feed from most to least significant. Market cap (a proxy for
+   AUM/liquidity, so tiny + thinly-traded names sink together) dominates, then
+   how long price has sat on one side of the EMA, then how far it is from the
+   line. Every input already rides on each cross row, so this needs no rescan. */
+
+const SIG_DURATION_REF = { weekly: 26, monthly: 12, quarterly: 8 };
+const SIG_CAP_FLOOR_LOG = 8;                  // $100M → 0
+const SIG_CAP_CEIL_LOG = Math.log10(3e12);    // ~$3T → 1
+const SIG_MAG_SATURATE = 15;                  // 15% from EMA → 1
+const SIG_WEIGHTS = { size: 0.5, duration: 0.35, magnitude: 0.15 };
+
+function sizeScore(cap) {
+  if (!(cap > 0)) return 0;
+  return clamp((Math.log10(cap) - SIG_CAP_FLOOR_LOG) / (SIG_CAP_CEIL_LOG - SIG_CAP_FLOOR_LOG), 0, 1);
+}
+
+function durationScore(count, tf) {
+  if (!(count > 0)) return 0;
+  return clamp(count / (SIG_DURATION_REF[tf] || 26), 0, 1);
+}
+
+function magnitudeScore(pct) {
+  if (pct == null) return 0;
+  return clamp(Math.abs(pct) / SIG_MAG_SATURATE, 0, 1);
+}
+
+function crossDuration(r, tf, dir) {
+  if (dir === 'above' || dir === 'below') return r.count || 0;
+  const key = dir === 'up' ? COUNT_KEYS[tf].up : COUNT_KEYS[tf].down;
+  return r[key] || 0;
+}
+
+function crossMagnitude(r, dir) {
+  return (dir === 'up' || dir === 'above') ? r.pctAbove : r.pctBelow;
+}
+
+function significanceScore(r, tf, dir) {
+  return SIG_WEIGHTS.size * sizeScore(r.marketCap)
+       + SIG_WEIGHTS.duration * durationScore(crossDuration(r, tf, dir), tf)
+       + SIG_WEIGHTS.magnitude * magnitudeScore(crossMagnitude(r, dir));
+}
+
+function sigTier(score) {
+  if (score >= 0.62) return 3;
+  if (score >= 0.38) return 2;
+  if (score >= 0.16) return 1;
+  return 0;
+}
 
 const tvLink = (sym, interval = 'W') =>
   `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}&interval=${interval}`;
@@ -449,7 +511,7 @@ function getCrossRows() {
       return1Y: s.return1Y ?? null,
       rsi: s.rsi ?? null,
       forwardPE: s.forwardPE ?? null,
-      marketCap: s.marketCap ?? null,
+      marketCap: r.marketCap ?? s.marketCap ?? null,
       emaStatus: s.emaStatus || {},
     };
   });
@@ -476,16 +538,16 @@ function getCrossRows() {
     );
   }
 
-  // Default sort: for "up", rank by weeksBelow desc (longer below = stronger reversal); for "down" by weeksAbove desc; for above/below by count desc.
-  const sortKey = (dir === 'up' || dir === 'above') ? COUNT_KEYS[tf].up
-                : (dir === 'down' || dir === 'below') ? COUNT_KEYS[tf].down
-                : null;
+  // Score every row, then sort. Default ranks most → least significant.
+  rows.forEach(r => { r._sig = significanceScore(r, tf, dir); });
 
-  if (dir === 'above' || dir === 'below') {
-    rows.sort((a, b) => (b.count || 0) - (a.count || 0));
-  } else if (sortKey) {
-    rows.sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0));
-  }
+  const sorters = {
+    significance: (a, b) => b._sig - a._sig,
+    duration: (a, b) => crossDuration(b, tf, dir) - crossDuration(a, tf, dir),
+    size: (a, b) => (b.marketCap || 0) - (a.marketCap || 0),
+    move: (a, b) => Math.abs(crossMagnitude(b, dir) || 0) - Math.abs(crossMagnitude(a, dir) || 0),
+  };
+  rows.sort(sorters[state.crossSort] || sorters.significance);
 
   return rows;
 }
@@ -515,6 +577,13 @@ function renderCrosses() {
     { id: 'small',   label: '$200B−' },
   ].map(c => `<button class="fchip${state.crossFilter === c.id ? ' active' : ''}" data-fchip="${c.id}">${c.label}</button>`).join('');
 
+  const sortChips = [
+    { id: 'significance', label: 'Significance' },
+    { id: 'duration',     label: 'Duration' },
+    { id: 'size',         label: 'Size' },
+    { id: 'move',         label: 'Move' },
+  ].map(c => `<button class="fchip${state.crossSort === c.id ? ' active' : ''}" data-sort="${c.id}">${c.label}</button>`).join('');
+
   const cardHTML = rows.map(r => renderCrossCard(r, tf, dir, dirCls)).join('');
   const empty = rows.length === 0 ? `<div class="empty-state"><div class="glyph">∅</div>No matches.</div>` : '';
 
@@ -534,6 +603,11 @@ function renderCrosses() {
       </div>
 
       <div class="chips-row">${chips}</div>
+
+      <div class="chips-row sort-row">
+        <span class="sort-label">Rank by</span>
+        ${sortChips}
+      </div>
 
       <div class="cross-search-wrap">
         <span class="cross-search-ic">⌕</span>
@@ -572,11 +646,15 @@ function renderCrossCard(r, tf, dir, dirCls) {
   const tag = isWatch ? '<span class="ext" style="color:var(--warn);border-color:rgba(251,191,36,0.4)">★ WATCH</span>'
             : isSector ? `<span class="ext">SECTOR</span>` : '';
 
+  const tier = sigTier(r._sig ?? 0);
+  const sigBar = `<span class="sig sig-${tier}" title="Significance ${Math.round((r._sig ?? 0) * 100)} · ${fmtCap(r.marketCap)}"><i></i><i></i><i></i></span>`;
+
   return `
     <button class="cross-card ${dirCls}" data-sym="${esc(r.symbol)}">
       <div class="cross-l">
         <div class="cross-sym">
           <span class="ticker">${esc(r.symbol)}</span>
+          ${sigBar}
           ${tag}
         </div>
         ${r.name ? `<div class="cross-name">${esc(r.name)}</div>` : ''}
@@ -585,7 +663,7 @@ function renderCrossCard(r, tf, dir, dirCls) {
       <div class="cross-r">
         <span class="cross-price">$${fmtPrice(r.close)}</span>
         <span class="cross-pct ${dirCls}">${pct != null ? (pct > 0 ? '+' : '') + pct.toFixed(2) + '%' : '—'}</span>
-        <span class="cross-meta">EMA ${fmtPrice(r.ema)}</span>
+        <span class="cross-meta">${fmtCap(r.marketCap)} · EMA ${fmtPrice(r.ema)}</span>
       </div>
     </button>
   `;
@@ -600,6 +678,9 @@ function wireCrosses() {
   );
   document.querySelectorAll('[data-fchip]').forEach(b =>
     b.addEventListener('click', () => { state.crossFilter = b.dataset.fchip; renderView(); })
+  );
+  document.querySelectorAll('[data-sort]').forEach(b =>
+    b.addEventListener('click', () => { state.crossSort = b.dataset.sort; renderView(); })
   );
   document.querySelectorAll('.cross-card[data-sym]').forEach(b =>
     b.addEventListener('click', () => openSymbolSheet(b.dataset.sym))
