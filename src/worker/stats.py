@@ -31,8 +31,23 @@ def compute_highest_close_pct(closes: list[float]) -> Optional[tuple[float, floa
     return (round((closes[-1] - high) / high * 100, 2) if high > 0 else 0.0), high
 
 
+def compute_low(closes: list[float]) -> Optional[float]:
+    """Return the 52-week daily closing low price.
+
+    Returns the lowest price recorded if the symbol does not have 52 weeks (252 closes) of price data.
+    """
+    if not closes:
+        return None
+    window = closes[-252:]
+    return round(min(window), 2)
+
+
 def compute_lowest_close_pct(closes: list[float]) -> Optional[tuple[float, float]]:
-    """Return (pct above 52wk low, the low value) using last 252 closes."""
+    """Return (pct above 52wk low, the low value) using last 252 closes.
+
+    The low is the 52-week daily closing low price, or the lowest price recorded
+    if the symbol does not have 52 weeks of price data.
+    """
     if not closes:
         return None
     window = closes[-252:]
@@ -86,6 +101,7 @@ def compute_stats(
 
     if low_res := compute_lowest_close_pct(closes):
         stats_res["lowPct"], stats_res["low52wk"] = low_res[0], round(low_res[1], 2)
+        stats_res["low"] = round(low_res[1], 2)
 
     if s_res := swing.analyze(closes, timestamps):
         stats_res.update(s_res)
