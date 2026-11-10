@@ -84,5 +84,7 @@ jobs:
           # Also upload to app/ prefix just in case they are resolved relative to index.html
           aws s3 cp ../web/css "s3://${BUCKET}/app/css" --recursive --cache-control "max-age=3600"
           aws s3 cp ../web/js "s3://${BUCKET}/app/js" --recursive --cache-control "max-age=3600"
+          aws s3 cp ../results/latest-stats.json "s3://${BUCKET}/results/latest-stats.json" --content-type "application/json" --cache-control "no-cache"
           aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+          aws lambda invoke --function-name ema-scanner-orchestrator /tmp/scan-trigger.json || true
 

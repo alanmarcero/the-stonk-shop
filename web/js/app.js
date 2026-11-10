@@ -938,7 +938,9 @@ function openSymbolSheet(sym) {
   if (s.return5Y != null) html += row('5 Year', fmtPct(s.return5Y, { decimals: 0 }), upDownCls(s.return5Y));
   if (bench && bench.fiveY != null && s.return5Y == null) html += row('5 Year', fmtPct(bench.fiveY, { decimals: 0 }), upDownCls(bench.fiveY));
   if (s.highPct != null) html += row('From 3yr High', fmtPct(s.highPct), s.highPct >= -5 ? 'up' : 'down');
-  if (s.lowPct != null) html += row('From 52w Low', fmtPct(s.lowPct), s.lowPct > 5 ? 'up' : 'down');
+  const lowVal = s.low ?? s.low52wk;
+  if (s.lowPct != null) html += row('From 52w Low', (lowVal != null ? `$${fmtPrice(lowVal)} · ` : '') + fmtPct(s.lowPct), s.lowPct > 5 ? 'up' : 'down');
+  else if (lowVal != null) html += row('52w Low', `$${fmtPrice(lowVal)}`);
   if (s.rsi != null) html += row('RSI(14)', s.rsi.toFixed(1), s.rsi > 70 ? 'down' : s.rsi < 30 ? 'up' : '');
   if (s.forwardPE != null) html += row('Fwd P/E', s.forwardPE.toFixed(1));
   if (s.pctSma200d != null) html += row('vs 200D SMA', fmtPct(s.pctSma200d), upDownCls(s.pctSma200d));

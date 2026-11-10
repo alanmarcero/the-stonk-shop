@@ -4,6 +4,7 @@ import pytest
 from src.worker.stats import (
     compute_ytd_pct,
     compute_highest_close_pct,
+    compute_low,
     compute_lowest_close_pct,
     compute_return_since,
     compute_stats,
@@ -92,6 +93,27 @@ class TestComputeHighestClosePct:
         assert compute_highest_close_pct([]) is None
 
 
+class TestComputeLow:
+
+    def test_uses_last_252_closes(self):
+        closes = [10.0] + [200.0] * 299
+        closes[100] = 50.0  # inside 252 window
+
+        low = compute_low(closes)
+
+        assert low == 50.0
+
+    def test_fewer_than_252_uses_lowest_recorded(self):
+        closes = [80.0, 100.0, 90.0]
+
+        low = compute_low(closes)
+
+        assert low == 80.0
+
+    def test_empty_returns_none(self):
+        assert compute_low([]) is None
+
+
 class TestComputeLowestClosePct:
 
     def test_uses_last_252_closes(self):
@@ -138,8 +160,20 @@ class TestComputeStats:
         assert result["close"] == 60.0
         assert result["return5Y"] == 20.0
         assert result["return1Y"] == 20.0
-        expected_keys = {"ytdPct", "highPct", "high3yr", "lowPct", "low52wk", "close", "return1Y", "return5Y"}
+        expected_keys = {"ytdPct", "highPct", "high3yr", "lowPct", "low52wk", "low", "close", "return1Y", "return5Y"}
         assert expected_keys.issubset(result.keys())
+        assert result["low"] == 50.0
+        assert result["low52wk"] == 50.0
+
+    def test_fewer_than_252_closes_uses_lowest_recorded_price(self):
+        closes = [100.0, 85.0, 95.0]
+        timestamps = [_ts(2026, 1, 1), _ts(2026, 1, 2), _ts(2026, 1, 3)]
+
+        result = compute_stats(closes, timestamps)
+
+        assert result is not None
+        assert result["low"] == 85.0
+        assert result["low52wk"] == 85.0
 
     def test_empty_returns_none(self):
         assert compute_stats([], []) is None
