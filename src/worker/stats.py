@@ -23,11 +23,27 @@ def compute_ytd_pct(closes: list[float], timestamps: list[int]) -> Optional[floa
     return round((closes[-1] - dec31_close) / dec31_close * 100, 2)
 
 
-def compute_highest_close_pct(closes: list[float]) -> Optional[tuple[float, float]]:
-    """Return (pct from 3yr high, the high value). Pct is negative or zero."""
+def compute_high(closes: list[float]) -> Optional[float]:
+    """Return the 52-week daily closing high price.
+
+    Returns the highest price recorded if the symbol does not have 52 weeks (252 closes) of price data.
+    """
     if not closes:
         return None
-    high = max(closes)
+    window = closes[-252:]
+    return round(max(window), 2)
+
+
+def compute_highest_close_pct(closes: list[float]) -> Optional[tuple[float, float]]:
+    """Return (pct from 52wk high, the high value) using last 252 closes. Pct is negative or zero.
+
+    The high is the 52-week daily closing high price, or the highest price recorded
+    if the symbol does not have 52 weeks of price data.
+    """
+    if not closes:
+        return None
+    window = closes[-252:]
+    high = max(window)
     return (round((closes[-1] - high) / high * 100, 2) if high > 0 else 0.0), high
 
 
@@ -97,7 +113,9 @@ def compute_stats(
         stats_res["ytdPct"] = ytd
 
     if high_res := compute_highest_close_pct(closes):
-        stats_res["highPct"], stats_res["high3yr"] = high_res[0], round(high_res[1], 2)
+        stats_res["highPct"], stats_res["high52wk"] = high_res[0], round(high_res[1], 2)
+        stats_res["high"] = round(high_res[1], 2)
+        stats_res["high3yr"] = round(high_res[1], 2)
 
     if low_res := compute_lowest_close_pct(closes):
         stats_res["lowPct"], stats_res["low52wk"] = low_res[0], round(low_res[1], 2)
