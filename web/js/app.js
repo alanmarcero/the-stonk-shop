@@ -937,10 +937,12 @@ function openSymbolSheet(sym) {
   if (s.return1Y != null) html += row('1 Year', fmtPct(s.return1Y), upDownCls(s.return1Y));
   if (s.return5Y != null) html += row('5 Year', fmtPct(s.return5Y, { decimals: 0 }), upDownCls(s.return5Y));
   if (bench && bench.fiveY != null && s.return5Y == null) html += row('5 Year', fmtPct(bench.fiveY, { decimals: 0 }), upDownCls(bench.fiveY));
-  if (s.highPct != null) html += row('From 3yr High', fmtPct(s.highPct), s.highPct >= -5 ? 'up' : 'down');
+  const highVal = s.high ?? s.high52wk ?? s.high3yr;
+  if (s.highPct != null) html += row('52W High', (highVal != null ? `$${fmtPrice(highVal)} · ` : '') + fmtPct(s.highPct), s.highPct >= -5 ? 'up' : 'down');
+  else if (highVal != null) html += row('52W High', `$${fmtPrice(highVal)}`);
   const lowVal = s.low ?? s.low52wk;
-  if (s.lowPct != null) html += row('From 52w Low', (lowVal != null ? `$${fmtPrice(lowVal)} · ` : '') + fmtPct(s.lowPct), s.lowPct > 5 ? 'up' : 'down');
-  else if (lowVal != null) html += row('52w Low', `$${fmtPrice(lowVal)}`);
+  if (s.lowPct != null) html += row('52W Low', (lowVal != null ? `$${fmtPrice(lowVal)} · ` : '') + fmtPct(s.lowPct), s.lowPct > 5 ? 'up' : 'down');
+  else if (lowVal != null) html += row('52W Low', `$${fmtPrice(lowVal)}`);
   if (s.rsi != null) html += row('RSI(14)', s.rsi.toFixed(1), s.rsi > 70 ? 'down' : s.rsi < 30 ? 'up' : '');
   if (s.forwardPE != null) html += row('Fwd P/E', s.forwardPE.toFixed(1));
   if (s.pctSma200d != null) html += row('vs 200D SMA', fmtPct(s.pctSma200d), upDownCls(s.pctSma200d));

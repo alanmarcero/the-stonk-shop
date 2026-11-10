@@ -3,6 +3,7 @@ import pytest
 
 from src.worker.stats import (
     compute_ytd_pct,
+    compute_high,
     compute_highest_close_pct,
     compute_low,
     compute_lowest_close_pct,
@@ -71,7 +72,46 @@ class TestComputeYtdPct:
         assert result == 10.0
 
 
+class TestComputeHigh:
+
+    def test_uses_last_252_closes(self):
+        closes = [500.0] + [100.0] * 299
+        closes[100] = 300.0  # inside 252 window
+
+        high = compute_high(closes)
+
+        assert high == 300.0
+
+    def test_fewer_than_252_uses_highest_recorded(self):
+        closes = [80.0, 100.0, 90.0]
+
+        high = compute_high(closes)
+
+        assert high == 100.0
+
+    def test_empty_returns_none(self):
+        assert compute_high([]) is None
+
+
 class TestComputeHighestClosePct:
+
+    def test_uses_last_252_closes(self):
+        # 300 closes, max in the first 48 (outside 252 window)
+        closes = [500.0] + [100.0] * 299
+        closes[100] = 300.0  # inside 252 window
+
+        _, high = compute_highest_close_pct(closes)
+
+        assert high == 300.0
+
+    def test_fewer_than_252_uses_all(self):
+        closes = [80.0, 100.0, 90.0]
+
+        pct, high = compute_highest_close_pct(closes)
+
+        assert high == 100.0
+        # (90 - 100) / 100 * 100 = -10.0
+        assert pct == -10.0
 
     def test_at_high(self):
         closes = [90.0, 95.0, 100.0]
@@ -160,10 +200,22 @@ class TestComputeStats:
         assert result["close"] == 60.0
         assert result["return5Y"] == 20.0
         assert result["return1Y"] == 20.0
-        expected_keys = {"ytdPct", "highPct", "high3yr", "lowPct", "low52wk", "low", "close", "return1Y", "return5Y"}
+        expected_keys = {"ytdPct", "highPct", "high52wk", "high", "high3yr", "lowPct", "low52wk", "low", "close", "return1Y", "return5Y"}
         assert expected_keys.issubset(result.keys())
+        assert result["high"] == 60.0
+        assert result["high52wk"] == 60.0
         assert result["low"] == 50.0
         assert result["low52wk"] == 50.0
+
+    def test_fewer_than_252_closes_uses_highest_recorded_price(self):
+        closes = [100.0, 150.0, 95.0]
+        timestamps = [_ts(2026, 1, 1), _ts(2026, 1, 2), _ts(2026, 1, 3)]
+
+        result = compute_stats(closes, timestamps)
+
+        assert result is not None
+        assert result["high"] == 150.0
+        assert result["high52wk"] == 150.0
 
     def test_fewer_than_252_closes_uses_lowest_recorded_price(self):
         closes = [100.0, 85.0, 95.0]
