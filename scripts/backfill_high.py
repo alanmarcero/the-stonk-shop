@@ -81,25 +81,41 @@ def main() -> None:
     for stat in stats_list:
         sym = stat.get("symbol")
         high_val = symbol_high_map.get(sym)
+        closes = symbol_closes_map.get(sym)
 
-        if high_val is None:
-            # Fallback to high3yr or close if candle fetch failed (e.g. delisted/OTC)
-            high_val = stat.get("high3yr") or stat.get("close")
-            if high_val is not None:
-                high_val = round(float(high_val), 2)
-                fallback_count += 1
+        if high_val is not None and closes:
+            latest_close = round(closes[-1], 2)
+            low_val = round(min(closes[-252:]), 2)
+            high_pct = round((latest_close - high_val) / high_val * 100, 2) if high_val > 0 else 0.0
+            low_pct = round((latest_close - low_val) / low_val * 100, 2) if low_val > 0 else 0.0
 
-        if high_val is not None:
+            stat["close"] = latest_close
+            stat["high"] = round(high_val, 2)
+            stat["high52wk"] = round(high_val, 2)
+            stat["highPct"] = high_pct
+            stat["low"] = low_val
+            stat["low52wk"] = low_val
+            stat["lowPct"] = low_pct
+            modified_count += 1
+        elif high_val is not None:
             close = stat.get("close", high_val)
-            if close > high_val:
-                high_val = round(close, 2)
-
             pct = round((close - high_val) / high_val * 100, 2) if high_val > 0 else 0.0
-
             stat["high"] = round(high_val, 2)
             stat["high52wk"] = round(high_val, 2)
             stat["highPct"] = pct
             modified_count += 1
+        else:
+            # Fallback to high3yr or close if candle fetch failed (e.g. delisted/OTC)
+            fallback_high = stat.get("high3yr") or stat.get("close")
+            if fallback_high is not None:
+                high_val = round(float(fallback_high), 2)
+                close = stat.get("close", high_val)
+                pct = round((close - high_val) / high_val * 100, 2) if high_val > 0 else 0.0
+                stat["high"] = round(high_val, 2)
+                stat["high52wk"] = round(high_val, 2)
+                stat["highPct"] = pct
+                modified_count += 1
+                fallback_count += 1
 
     # Recalculate breadth stat pctWithin5OfHigh
     h_pcts = [s["highPct"] for s in stats_list if "highPct" in s]
@@ -119,17 +135,34 @@ def main() -> None:
         batch_modified = 0
         for item in batch_data.get("stats", []):
             sym = item.get("symbol")
-            high_val = symbol_high_map.get(sym) or item.get("high3yr") or item.get("close")
-            if high_val is not None:
-                high_val = round(float(high_val), 2)
-                close = item.get("close", high_val)
-                if close > high_val:
-                    high_val = round(close, 2)
-                pct = round((close - high_val) / high_val * 100, 2) if high_val > 0 else 0.0
+            high_val = symbol_high_map.get(sym)
+            closes = symbol_closes_map.get(sym)
+            if high_val is not None and closes:
+                latest_close = round(closes[-1], 2)
+                low_val = round(min(closes[-252:]), 2)
+                item["close"] = latest_close
                 item["high"] = round(high_val, 2)
                 item["high52wk"] = round(high_val, 2)
-                item["highPct"] = pct
+                item["highPct"] = round((latest_close - high_val) / high_val * 100, 2) if high_val > 0 else 0.0
+                item["low"] = low_val
+                item["low52wk"] = low_val
+                item["lowPct"] = round((latest_close - low_val) / low_val * 100, 2) if low_val > 0 else 0.0
                 batch_modified += 1
+            elif high_val is not None:
+                close = item.get("close", high_val)
+                item["high"] = round(high_val, 2)
+                item["high52wk"] = round(high_val, 2)
+                item["highPct"] = round((close - high_val) / high_val * 100, 2) if high_val > 0 else 0.0
+                batch_modified += 1
+            else:
+                fallback_high = item.get("high3yr") or item.get("close")
+                if fallback_high is not None:
+                    h = round(float(fallback_high), 2)
+                    c = item.get("close", h)
+                    item["high"] = h
+                    item["high52wk"] = h
+                    item["highPct"] = round((c - h) / h * 100, 2) if h > 0 else 0.0
+                    batch_modified += 1
 
         if batch_modified > 0:
             with open(batch_path, "w", encoding="utf-8") as f:
