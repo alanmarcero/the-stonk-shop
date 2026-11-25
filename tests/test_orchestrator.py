@@ -183,6 +183,50 @@ class TestLambdaHandler:
 
         assert json.loads(result["body"])["vixSpikes"] == 2
 
+    def test_http_rejects_when_dev_key_unset(self, mock_orchestrator_deps):
+        event = {
+            "requestContext": {"http": {"method": "GET"}},
+            "queryStringParameters": None,
+            "headers": {},
+        }
+        result = lambda_handler(event, None)
+        assert result["statusCode"] == 403
+
+    def test_http_handles_none_query_params_and_rejects_bad_header(self, mock_orchestrator_deps):
+        with patch.dict("os.environ", {"DEV_KEY": "secret-123"}):
+            event = {
+                "requestContext": {"http": {"method": "POST"}},
+                "queryStringParameters": None,
+                "headers": {"x-dev-key": "wrong"},
+            }
+            result = lambda_handler(event, None)
+        assert result["statusCode"] == 403
+
+    def test_http_allows_valid_x_dev_key_header_for_status_and_trigger(self, mock_orchestrator_deps):
+        mock_s3, _, _ = mock_orchestrator_deps
+        mock_s3.get_object.return_value = _make_s3_response(["AAPL"])
+        with patch.dict("os.environ", {"DEV_KEY": "secret-123"}):
+            status_res = lambda_handler(
+                {
+                    "requestContext": {"http": {"method": "GET"}},
+                    "queryStringParameters": None,
+                    "headers": {"X-Dev-Key": "secret-123"},
+                },
+                None,
+            )
+            assert status_res["statusCode"] == 200
+            assert json.loads(status_res["body"]) == {"running": False, "inFlight": 0}
+
+            post_res = lambda_handler(
+                {
+                    "requestContext": {"http": {"method": "POST"}},
+                    "queryStringParameters": None,
+                    "headers": {"x-dev-key": "secret-123"},
+                },
+                None,
+            )
+            assert post_res["statusCode"] == 200
+
 
 class TestBatchSize:
 

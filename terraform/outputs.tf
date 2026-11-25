@@ -25,8 +25,3 @@ output "worker_arn" {
 output "cloudfront_distribution_id" {
   value = aws_cloudfront_distribution.results.id
 }
-
-output "dev_key" {
-  value     = var.dev_key
-  sensitive = true
-}

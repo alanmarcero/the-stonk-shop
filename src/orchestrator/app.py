@@ -1,3 +1,4 @@
+import hmac
 import json
 import os
 import urllib.request
@@ -42,10 +43,18 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
 
 def _check_authorization(event: dict) -> Optional[dict]:
-    dev_key = os.environ.get("DEV_KEY", "")
     is_http = "requestContext" in event and "http" in event["requestContext"]
-    if is_http and event.get("queryStringParameters", {}).get("dev_key") != dev_key:
-        print(f"[orchestrator] Unauthorized HTTP access attempt")
+    if not is_http:
+        return None
+    dev_key = os.environ.get("DEV_KEY", "").strip()
+    if not dev_key:
+        print("[orchestrator] DEV_KEY is not configured; rejecting HTTP request")
+        return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
+    headers = {str(k).lower(): v for k, v in (event.get("headers") or {}).items()}
+    query_params = event.get("queryStringParameters") or {}
+    provided = headers.get("x-dev-key") or query_params.get("dev_key") or ""
+    if not hmac.compare_digest(str(provided), dev_key):
+        print("[orchestrator] Unauthorized HTTP access attempt")
         return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
     return None
 

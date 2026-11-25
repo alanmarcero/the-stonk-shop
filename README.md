@@ -52,7 +52,7 @@ aws lambda invoke --function-name ema-scanner-orchestrator /dev/stdout
 **GitHub Actions:** Automatically triggered on push to `main`.
 1.  **Test:** Executes 243 unit tests via `pytest`.
 2.  **Infrastructure:** Applies Terraform changes (IAM, Lambda, SQS, S3).
-3.  **App:** Injects `ORCHESTRATOR_URL` into `index.html` and deploys to S3.
+3.  **App:** Injects `ORCHESTRATOR_URL` into `web/js/app.js` and deploys to S3.
 4.  **CDN:** Invalidates CloudFront cache for instant updates.
 
 ## License

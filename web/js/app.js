@@ -3,7 +3,7 @@
    ───────────────────────────────────────────── */
 
 const ORCHESTRATOR_URL = '__ORCHESTRATOR_URL__';
-const DEV_KEY = '__DEV_KEY__';
+const DEV_KEY_STORAGE = 'ss_dev_key';
 
 const VIEWS = ['pulse', 'crosses', 'more'];
 
@@ -1018,9 +1018,31 @@ function renderHeaderMeta() {
   meta.innerHTML = parts.join(' · ') || '—';
 }
 
-async function checkScanStatus(opts = {}) {
+function getStoredDevKey() {
+  try { return (localStorage.getItem(DEV_KEY_STORAGE) || '').trim(); } catch { return ''; }
+}
+function setStoredDevKey(key) {
   try {
-    const res = await fetch(`${ORCHESTRATOR_URL}?dev_key=${DEV_KEY}`, { method: 'GET' });
+    if (!key) {
+      localStorage.removeItem(DEV_KEY_STORAGE);
+      return;
+    }
+    localStorage.setItem(DEV_KEY_STORAGE, key);
+  } catch {}
+}
+
+async function checkScanStatus(opts = {}) {
+  const devKey = getStoredDevKey();
+  if (!devKey) return;
+  try {
+    const res = await fetch(ORCHESTRATOR_URL, {
+      method: 'GET',
+      headers: { 'x-dev-key': devKey },
+    });
+    if (res.status === 403) {
+      setStoredDevKey('');
+      return;
+    }
     if (!res.ok) return;
     const data = await res.json();
     const wasScanning = state.isScanning;
@@ -1043,11 +1065,28 @@ async function checkScanStatus(opts = {}) {
 }
 
 async function triggerScan() {
+  let devKey = getStoredDevKey();
+  if (!devKey) {
+    const entered = window.prompt('Enter admin scan key:');
+    devKey = entered ? entered.trim() : '';
+    if (!devKey) return;
+    setStoredDevKey(devKey);
+  }
   const btn = document.getElementById('run-scan-btn');
   btn.disabled = true;
   btn.classList.add('busy');
   try {
-    await fetch(`${ORCHESTRATOR_URL}?dev_key=${DEV_KEY}`, { method: 'POST' });
+    const res = await fetch(ORCHESTRATOR_URL, {
+      method: 'POST',
+      headers: { 'x-dev-key': devKey },
+    });
+    if (res.status === 403) {
+      setStoredDevKey('');
+      btn.classList.remove('busy');
+      btn.disabled = false;
+      window.alert('Invalid scan key.');
+      return;
+    }
     setTimeout(checkScanStatus, 4000);
   } catch (e) {
     console.warn('[scan] trigger failed', e);
