@@ -12,14 +12,17 @@ output "bucket_name" {
 
 output "orchestrator_arn" {
   value = aws_lambda_function.orchestrator.arn
+  sensitive = true
 }
 
 output "orchestrator_url" {
   value = aws_lambda_function_url.orchestrator_url.function_url
+  sensitive = true
 }
 
 output "worker_arn" {
   value = aws_lambda_function.worker.arn
+  sensitive = true
 }
 
 output "cloudfront_distribution_id" {
