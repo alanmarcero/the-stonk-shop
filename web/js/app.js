@@ -82,7 +82,11 @@ function saveWatchlist() {
 
 /* ── Helpers ── */
 
-const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+const esc = (s) => {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
 
 const fmtPct = (v, opts = {}) => {
   if (v == null || Number.isNaN(v)) return '—';
@@ -293,9 +297,9 @@ function renderSectorsSection() {
     if (!b) return '';
     const st = state.stats[sym]?.emaStatus || {};
     return `
-      <button class="chip" data-sym="${sym}">
+      <button class="chip" data-sym="${esc(sym)}">
         <div class="chip-head">
-          <span class="chip-sym">${sym}</span>
+          <span class="chip-sym">${esc(sym)}</span>
           ${tripleDots(st).replace('watch-dots', 'chip-dots')}
         </div>
         <div class="chip-name">${esc(SECTOR_NAMES[sym] || sym)}</div>
@@ -329,7 +333,7 @@ function renderWatchlistSection() {
 
     if (!s) {
       return `
-        <div class="watch-row" data-sym="${sym}">
+        <div class="watch-row" data-sym="${esc(sym)}">
           <div class="watch-sym">
             <span class="watch-sym-tic">${esc(sym)}</span>
             <span class="watch-sym-name muted">No data</span>
@@ -342,7 +346,7 @@ function renderWatchlistSection() {
     }
 
     return `
-      <div class="watch-row" data-sym="${sym}">
+      <div class="watch-row" data-sym="${esc(sym)}">
         <div class="watch-sym">
           <span class="watch-sym-tic">${esc(sym)}</span>
           <span class="watch-sym-name">${esc(name)}</span>
@@ -758,8 +762,8 @@ function renderBenchTable() {
     ...ordered.map(sym => {
       const b = bench[sym];
       return `
-        <div class="bench-row" data-sym="${sym}">
-          <span class="bench-sym">${sym}</span>
+        <div class="bench-row" data-sym="${esc(sym)}">
+          <span class="bench-sym">${esc(sym)}</span>
           <span class="bench-cell ${upDownCls(b.ytd)}">${fmtPct(b.ytd)}</span>
           <span class="bench-cell ${upDownCls(b.oneY)}">${fmtPct(b.oneY)}</span>
           <span class="bench-cell ${upDownCls(b.fiveY)}">${fmtPct(b.fiveY, { decimals: 0 })}</span>
@@ -839,7 +843,7 @@ function renderPriceBreaks() {
     const sign = isBreakout ? '▲' : '▼';
 
     return `
-      <button class="cross-card ${cls}" data-sym="${s.symbol}">
+      <button class="cross-card ${cls}" data-sym="${esc(s.symbol)}">
         <div class="cross-l">
           <div class="cross-sym"><span class="ticker">${esc(s.symbol)}</span></div>
           ${s.name ? `<div class="cross-name">${esc(s.name)}</div>` : ''}
@@ -868,7 +872,7 @@ function renderYTDExtremes() {
         ${rows.map(s => {
           const cls = upDownCls(s.ytdPct);
           return `
-            <button class="cross-card ${cls}" data-sym="${s.symbol}">
+            <button class="cross-card ${cls}" data-sym="${esc(s.symbol)}">
               <div class="cross-l">
                 <div class="cross-sym"><span class="ticker">${esc(s.symbol)}</span></div>
                 ${s.name ? `<div class="cross-name">${esc(s.name)}</div>` : ''}
